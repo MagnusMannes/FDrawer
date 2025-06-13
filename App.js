@@ -4,6 +4,10 @@ const parts = [];
 let selectedPart = null;
 let copiedColor = null;
 
+const APP_VERSION = "1.0";
+document.getElementById("version").textContent = APP_VERSION;
+document.getElementById("lastUpdated").textContent = document.lastModified.split(" ")[0];
+
 // --- Toolbar buttons ---
 document.getElementById("addBody").addEventListener("click", addBody);
 
@@ -180,6 +184,10 @@ function addPartEventListeners(part) {
     selectPart(part);
     handleConnectorToggle(e, part);
   });
+  part.g.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    removePart(part);
+  });
   part.handle.addEventListener("mousedown", (e) => startResize(e, part));
   part.handle.addEventListener(
     "touchstart",
@@ -328,6 +336,31 @@ function updatePartWidth(part) {
   part.bottomLabel.setAttribute("x", part.x + part.width / 2);
   if (part.specialIcon) {
     part.specialIcon.setAttribute("x", part.x + part.width + 4);
+  }
+}
+
+function removePart(part) {
+  const idx = parts.indexOf(part);
+  if (idx === -1) return;
+  canvas.removeChild(part.g);
+  parts.splice(idx, 1);
+  if (selectedPart === part) selectedPart = null;
+  let baseY = idx > 0 ? parts[idx - 1].y + parts[idx - 1].height : 20;
+  for (let i = idx; i < parts.length; i++) {
+    parts[i].y = baseY;
+    parts[i].rect.setAttribute("y", baseY);
+    parts[i].handle.setAttribute("y", baseY + parts[i].height - 5);
+    parts[i].leftHandle.setAttribute("y", baseY + parts[i].height / 2 - 5);
+    parts[i].rightHandle.setAttribute("y", baseY + parts[i].height / 2 - 5);
+    parts[i].topLabel.setAttribute("y", baseY - 6);
+    parts[i].bottomLabel.setAttribute("y", baseY + parts[i].height + 6);
+    if (parts[i].specialIcon) {
+      parts[i].specialIcon.setAttribute(
+        "y",
+        baseY + parts[i].height / 2 - 7
+      );
+    }
+    baseY += parts[i].height;
   }
 }
 
