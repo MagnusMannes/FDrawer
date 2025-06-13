@@ -5,7 +5,62 @@ let selectedPart = null;
 let copiedColor = null;
 let creatingSpecial = false,
   specialSymmetry = false,
-  specialDraft = null;
+  specialDraft = null,
+  contextTarget = null,
+  contextType = "";
+
+function showContextMenu(x, y, type, target) {
+  contextTarget = target;
+  contextType = type;
+  const menu = document.getElementById("contextMenu");
+  menu.style.left = x + "px";
+  menu.style.top = y + "px";
+  document.getElementById("ctxRound").style.display = type === "form" ? "block" : "none";
+  document.getElementById("ctxRemoveForm").style.display = type === "form" ? "block" : "none";
+  document.getElementById("ctxRemoveBody").style.display = type === "body" ? "block" : "none";
+  menu.style.display = "block";
+}
+
+function hideContextMenu() {
+  document.getElementById("contextMenu").style.display = "none";
+  contextTarget = null;
+  contextType = "";
+}
+
+window.addEventListener("click", hideContextMenu);
+
+document.getElementById("ctxRemoveBody").addEventListener("click", () => {
+  if (contextType === "body" && contextTarget) removePart(contextTarget);
+  hideContextMenu();
+});
+
+document.getElementById("ctxRemoveForm").addEventListener("click", () => {
+  if (contextType === "form" && contextTarget) {
+    if (contextTarget.rect.parentNode)
+      contextTarget.rect.parentNode.removeChild(contextTarget.rect);
+    if (contextTarget.rect2 && contextTarget.rect2.parentNode)
+      contextTarget.rect2.parentNode.removeChild(contextTarget.rect2);
+    const list = contextTarget.part.specialForms;
+    const idx = list.indexOf(contextTarget);
+    if (idx !== -1) list.splice(idx, 1);
+  }
+  hideContextMenu();
+});
+
+document.getElementById("ctxRound").addEventListener("click", () => {
+  if (contextType === "form" && contextTarget) {
+    const r = prompt("Roundness", "10");
+    if (r) {
+      contextTarget.rect.setAttribute("rx", r);
+      contextTarget.rect.setAttribute("ry", r);
+      if (contextTarget.rect2) {
+        contextTarget.rect2.setAttribute("rx", r);
+        contextTarget.rect2.setAttribute("ry", r);
+      }
+    }
+  }
+  hideContextMenu();
+});
 
 const APP_VERSION = "1.0";
 document.getElementById("version").textContent = APP_VERSION;
@@ -185,7 +240,7 @@ function addPartEventListeners(part) {
   });
   part.g.addEventListener("contextmenu", (e) => {
     e.preventDefault();
-    removePart(part);
+    showContextMenu(e.pageX, e.pageY, "body", part);
   });
   part.handle.addEventListener("mousedown", (e) => startResize(e, part));
   part.handle.addEventListener(
@@ -240,9 +295,10 @@ function startSpecialDraw(e) {
   const fromLeft = x - partX < partW / 2;
   specialDraft = {
     side: fromLeft ? "left" : "right",
-    startX: x,
+    originX: fromLeft ? partX : partX + partW,
     startY: y,
     rect: document.createElementNS(svgNS, "rect"),
+    part: selectedPart,
   };
   const r = specialDraft.rect;
   r.classList.add("special-form");
@@ -260,24 +316,18 @@ function moveSpecialDraw(e) {
   if (!specialDraft) return;
   const x = e.offsetX;
   const y = e.offsetY;
-  const sx = specialDraft.startX;
+  const originX = specialDraft.originX;
   const sy = specialDraft.startY;
-  const w = Math.abs(x - sx);
+  const w = Math.abs(x - originX);
   const h = Math.abs(y - sy);
-  const minX = Math.min(x, sx);
   const minY = Math.min(y, sy);
-  if (specialDraft.side === "left") {
-    specialDraft.rect.setAttribute("x", sx - w);
-  } else {
-    specialDraft.rect.setAttribute("x", sx);
-  }
+  specialDraft.rect.setAttribute("x", specialDraft.side === "left" ? originX - w : originX);
   specialDraft.rect.setAttribute("y", minY);
   specialDraft.rect.setAttribute("width", w);
   specialDraft.rect.setAttribute("height", h);
   if (specialDraft.rect2) {
-    const partX = selectedPart.x;
-    const center = partX + selectedPart.width / 2;
-    const dx = specialDraft.side === "left" ? center - (sx - w) - w : (sx + w) - center;
+    const center = selectedPart.x + selectedPart.width / 2;
+    const dx = specialDraft.side === "left" ? center - (originX - w) - w : (originX + w) - center;
     specialDraft.rect2.setAttribute("x", center + dx);
     specialDraft.rect2.setAttribute("y", minY);
     specialDraft.rect2.setAttribute("width", w);
@@ -288,28 +338,31 @@ function moveSpecialDraw(e) {
 function endSpecialDraw() {
   canvas.removeEventListener("mousemove", moveSpecialDraw);
   window.removeEventListener("mouseup", endSpecialDraw);
+  canvas.removeEventListener("mousedown", startSpecialDraw);
   creatingSpecial = false;
+  const w = parseFloat(specialDraft.rect.getAttribute("width"));
+  const h = parseFloat(specialDraft.rect.getAttribute("height"));
+  if (w < 5 || h < 5) {
+    if (specialDraft.rect.parentNode) specialDraft.rect.parentNode.removeChild(specialDraft.rect);
+    if (specialDraft.rect2 && specialDraft.rect2.parentNode) specialDraft.rect2.parentNode.removeChild(specialDraft.rect2);
+    specialDraft = null;
+    return;
+  }
   if (!selectedPart.specialForms) selectedPart.specialForms = [];
+  specialDraft.part = selectedPart;
   selectedPart.specialForms.push(specialDraft);
   if (specialDraft.rect) {
-    specialDraft.rect.addEventListener("contextmenu", specialContext);
+    specialDraft.rect.addEventListener("contextmenu", (ev) => specialContext(ev, specialDraft));
   }
   if (specialDraft.rect2) {
-    specialDraft.rect2.addEventListener("contextmenu", specialContext);
+    specialDraft.rect2.addEventListener("contextmenu", (ev) => specialContext(ev, specialDraft));
   }
   specialDraft = null;
 }
 
-function specialContext(e) {
+function specialContext(e, form) {
   e.preventDefault();
-  const action = prompt('Type "remove" to delete or enter roundness value');
-  if (!action) return;
-  if (action === "remove") {
-    if (e.target.parentNode) e.target.parentNode.removeChild(e.target);
-  } else {
-    e.target.setAttribute("rx", action);
-    e.target.setAttribute("ry", action);
-  }
+  showContextMenu(e.pageX, e.pageY, "form", form);
 }
 function labelFor(s) {
   return s === "none" ? "" : s;
@@ -527,7 +580,8 @@ function loadFromData(data) {
         }
         r.classList.add("special-form");
         g.appendChild(r);
-        r.addEventListener("contextmenu", specialContext);
+        const formObj = { rect: r, rect2: null, side: sf.side, part: null };
+        r.addEventListener("contextmenu", (ev) => specialContext(ev, formObj));
         let r2 = null;
         if (sf.symmetrical) {
           r2 = document.createElementNS(svgNS, "rect");
@@ -543,9 +597,10 @@ function loadFromData(data) {
           }
           r2.classList.add("special-form");
           g.appendChild(r2);
-          r2.addEventListener("contextmenu", specialContext);
+          r2.addEventListener("contextmenu", (ev) => specialContext(ev, formObj));
         }
-        specialForms.push({ rect: r, rect2: r2, side: sf.side });
+        formObj.rect2 = r2;
+        specialForms.push(formObj);
       });
     }
 
@@ -565,6 +620,7 @@ function loadFromData(data) {
       specialIcon,
       specialForms,
     };
+    specialForms.forEach((f) => (f.part = partData));
     parts.push(partData);
     addPartEventListeners(partData);
   });
