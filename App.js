@@ -3,7 +3,7 @@ const canvas = document.getElementById("diagramCanvas");
 const parts = [];
 let selectedPart = null;
 let copiedColor = null;
-let connectorMode = false;
+
 
 // --- Toolbar buttons ---
 document.getElementById("addBody").addEventListener("click", addBody);
@@ -40,17 +40,13 @@ document.getElementById("addSpecial").addEventListener("click", () => {
   }
 });
 
-const toggleConnectorBtn = document.getElementById("toggleConnector");
-toggleConnectorBtn.addEventListener("click", () => {
-  connectorMode = !connectorMode;
-  toggleConnectorBtn.classList.toggle("active", connectorMode);
-});
 
 document.getElementById("copyColor").addEventListener("click", () => {
   if (selectedPart) {
     copiedColor = selectedPart.color;
   }
 });
+
 document.getElementById("pasteColor").addEventListener("click", () => {
   if (selectedPart && copiedColor) {
     selectedPart.color = copiedColor;
