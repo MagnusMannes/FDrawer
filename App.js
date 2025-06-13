@@ -4,8 +4,7 @@ const parts = [];
 let selectedPart = null;
 let copiedColor = null;
 let creatingSpecial = false,
-  specialSymmetry = false,
-  specialDraft = null;
+  specialSymmetry = false;
 
 const APP_VERSION = "1.0";
 document.getElementById("version").textContent = APP_VERSION;
@@ -17,7 +16,7 @@ document.getElementById("addBody").addEventListener("click", addBody);
 document.getElementById("colorPicker").addEventListener("input", (e) => {
   if (selectedPart) {
     selectedPart.color = e.target.value;
-    selectedPart.rect.setAttribute("fill", e.target.value);
+    selectedPart.shape.setAttribute("fill", e.target.value);
   }
 });
 
@@ -41,7 +40,7 @@ document.getElementById("copyColor").addEventListener("click", () => {
 document.getElementById("pasteColor").addEventListener("click", () => {
   if (selectedPart && copiedColor) {
     selectedPart.color = copiedColor;
-    selectedPart.rect.setAttribute("fill", copiedColor);
+    selectedPart.shape.setAttribute("fill", copiedColor);
     document.getElementById("colorPicker").value = copiedColor;
   }
 });
@@ -66,6 +65,7 @@ document.getElementById("exportBtn").addEventListener("click", () => {
         side: f.side,
         symmetrical: !!f.rect2,
       })),
+      symVertices: (p.symVertices || []).map((v) => ({ y: v.y, dx: v.dx })),
     })),
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], {
@@ -106,13 +106,22 @@ function addBody() {
 
   const g = document.createElementNS(svgNS, "g");
 
+  const shape = document.createElementNS(svgNS, "polygon");
+  shape.setAttribute(
+    "points",
+    `${x},${y} ${x + width},${y} ${x + width},${y + height} ${x},${y + height}`
+  );
+  shape.setAttribute("fill", "#cccccc");
+  shape.classList.add("body-shape");
+  g.appendChild(shape);
+
   const rect = document.createElementNS(svgNS, "rect");
   rect.setAttribute("x", x);
   rect.setAttribute("y", y);
   rect.setAttribute("width", width);
   rect.setAttribute("height", height);
-  rect.setAttribute("fill", "#cccccc");
-  rect.classList.add("rect");
+  rect.setAttribute("fill", "none");
+  rect.setAttribute("pointer-events", "none");
   g.appendChild(rect);
 
   const handle = document.createElementNS(svgNS, "rect");
@@ -156,6 +165,9 @@ function addBody() {
     bottomConnector: "none",
     special: false,
     specialForms: [],
+    shape,
+    symVertices: [],
+    vertexHandles: [],
     g,
     rect,
     handle,
@@ -179,7 +191,7 @@ function createConnectorLabel(x, y) {
 }
 
 function addPartEventListeners(part) {
-  part.rect.addEventListener("click", (e) => {
+  part.shape.addEventListener("click", (e) => {
     selectPart(part);
     handleConnectorToggle(e, part);
   });
@@ -203,16 +215,18 @@ function addPartEventListeners(part) {
 function selectPart(part) {
   if (selectedPart) {
     selectedPart.rect.classList.remove("selected");
+    if (selectedPart.shape) selectedPart.shape.classList.remove("selected");
   }
   selectedPart = part;
   part.rect.classList.add("selected");
+  if (part.shape) part.shape.classList.add("selected");
   document.getElementById("colorPicker").value = part.color;
 }
 
 function handleConnectorToggle(evt, part) {
   const y = evt.offsetY;
-  const rectY = parseFloat(part.rect.getAttribute("y"));
-  const h = parseFloat(part.rect.getAttribute("height"));
+  const rectY = part.y;
+  const h = part.height;
   if (y < rectY + 10) {
     part.topConnector = nextState(part.topConnector);
     part.topLabel.textContent = labelFor(part.topConnector);
@@ -230,75 +244,34 @@ function nextState(s) {
 // --- Special Feature Drawing ---
 function startSpecialDraw(e) {
   if (!creatingSpecial || !selectedPart) return;
-  if (e.target !== selectedPart.rect) return;
-  const partX = selectedPart.x;
-  const partY = selectedPart.y;
-  const partW = selectedPart.width;
-  const partH = selectedPart.height;
-  const x = e.offsetX;
-  const y = e.offsetY;
-  const fromLeft = x - partX < partW / 2;
-  specialDraft = {
-    side: fromLeft ? "left" : "right",
-    startX: x,
-    startY: y,
-    rect: document.createElementNS(svgNS, "rect"),
-  };
-  const r = specialDraft.rect;
-  r.classList.add("special-form");
-  selectedPart.g.appendChild(r);
-  if (specialSymmetry) {
-    specialDraft.rect2 = document.createElementNS(svgNS, "rect");
-    specialDraft.rect2.classList.add("special-form");
-    selectedPart.g.appendChild(specialDraft.rect2);
-  }
-  canvas.addEventListener("mousemove", moveSpecialDraw);
-  window.addEventListener("mouseup", endSpecialDraw);
-}
-
-function moveSpecialDraw(e) {
-  if (!specialDraft) return;
-  const x = e.offsetX;
-  const y = e.offsetY;
-  const sx = specialDraft.startX;
-  const sy = specialDraft.startY;
-  const w = Math.abs(x - sx);
-  const h = Math.abs(y - sy);
-  const minX = Math.min(x, sx);
-  const minY = Math.min(y, sy);
-  if (specialDraft.side === "left") {
-    specialDraft.rect.setAttribute("x", sx - w);
-  } else {
-    specialDraft.rect.setAttribute("x", sx);
-  }
-  specialDraft.rect.setAttribute("y", minY);
-  specialDraft.rect.setAttribute("width", w);
-  specialDraft.rect.setAttribute("height", h);
-  if (specialDraft.rect2) {
-    const partX = selectedPart.x;
-    const center = partX + selectedPart.width / 2;
-    const dx = specialDraft.side === "left" ? center - (sx - w) - w : (sx + w) - center;
-    specialDraft.rect2.setAttribute("x", center + dx);
-    specialDraft.rect2.setAttribute("y", minY);
-    specialDraft.rect2.setAttribute("width", w);
-    specialDraft.rect2.setAttribute("height", h);
-  }
-}
-
-function endSpecialDraw() {
-  canvas.removeEventListener("mousemove", moveSpecialDraw);
-  window.removeEventListener("mouseup", endSpecialDraw);
+  if (e.target !== selectedPart.shape) return;
+  const part = selectedPart;
+  const offsetY = e.offsetY - part.y;
+  const vertex = { y: offsetY, dx: 0 };
+  part.symVertices.push(vertex);
+  const hl = document.createElementNS(svgNS, "rect");
+  hl.setAttribute("width", 8);
+  hl.setAttribute("height", 8);
+  hl.classList.add("vertex-handle");
+  part.g.appendChild(hl);
+  hl.addEventListener("mousedown", (evt) => startVertexDrag(evt, part, vertex, "left"));
+  const hr = document.createElementNS(svgNS, "rect");
+  hr.setAttribute("width", 8);
+  hr.setAttribute("height", 8);
+  hr.classList.add("vertex-handle");
+  part.g.appendChild(hr);
+  hr.addEventListener("mousedown", (evt) => startVertexDrag(evt, part, vertex, "right"));
+  vertex.handleLeft = hl;
+  vertex.handleRight = hr;
+  part.vertexHandles.push(hl, hr);
+  updatePolygonShape(part);
+  updateVertexHandles(part);
+  const fromLeft = e.offsetX - part.x < part.width / 2;
+  startVertexDrag(e, part, vertex, fromLeft ? "left" : "right");
   creatingSpecial = false;
-  if (!selectedPart.specialForms) selectedPart.specialForms = [];
-  selectedPart.specialForms.push(specialDraft);
-  if (specialDraft.rect) {
-    specialDraft.rect.addEventListener("contextmenu", specialContext);
-  }
-  if (specialDraft.rect2) {
-    specialDraft.rect2.addEventListener("contextmenu", specialContext);
-  }
-  specialDraft = null;
+  canvas.removeEventListener("mousedown", startSpecialDraw);
 }
+
 
 function specialContext(e) {
   e.preventDefault();
@@ -346,6 +319,15 @@ function doResize(e) {
   resizePart.leftHandle.setAttribute("y", resizePart.y + newH / 2 - 5);
   resizePart.rightHandle.setAttribute("y", resizePart.y + newH / 2 - 5);
   resizePart.bottomLabel.setAttribute("y", resizePart.y + newH + 6);
+
+  const scale = newH / startHeight;
+  if (resizePart.symVertices) {
+    resizePart.symVertices.forEach((v) => {
+      v.y *= scale;
+    });
+  }
+  updatePolygonShape(resizePart);
+  updateVertexHandles(resizePart);
 
   const idx = parts.indexOf(resizePart);
   let baseY = resizePart.y + newH;
@@ -421,6 +403,64 @@ function updatePartWidth(part) {
   if (part.specialIcon) {
     part.specialIcon.setAttribute("x", part.x + part.width + 4);
   }
+  updatePolygonShape(part);
+  updateVertexHandles(part);
+}
+
+// --- Polygon Shape Helpers ---
+function updatePolygonShape(part) {
+  const x = part.x;
+  const y = part.y;
+  const w = part.width;
+  const h = part.height;
+  const verts = (part.symVertices || []).slice().sort((a, b) => a.y - b.y);
+  const pts = [];
+  pts.push(`${x},${y}`);
+  pts.push(`${x + w},${y}`);
+  verts.forEach((v) => {
+    pts.push(`${x + w + v.dx},${y + v.y}`);
+  });
+  pts.push(`${x + w},${y + h}`);
+  pts.push(`${x},${y + h}`);
+  for (let i = verts.length - 1; i >= 0; i--) {
+    const v = verts[i];
+    pts.push(`${x - v.dx},${y + v.y}`);
+  }
+  part.shape.setAttribute("points", pts.join(" "));
+}
+
+function updateVertexHandles(part) {
+  if (!part.symVertices) return;
+  part.symVertices.forEach((v) => {
+    v.handleLeft.setAttribute("x", part.x - v.dx - 4);
+    v.handleLeft.setAttribute("y", part.y + v.y - 4);
+    v.handleRight.setAttribute("x", part.x + part.width + v.dx - 4);
+    v.handleRight.setAttribute("y", part.y + v.y - 4);
+  });
+}
+
+let vertexDrag = null;
+function startVertexDrag(e, part, vertex, side) {
+  e.preventDefault();
+  vertexDrag = { part, vertex, side, startX: e.clientX, startDx: vertex.dx };
+  window.addEventListener("mousemove", doVertexDrag);
+  window.addEventListener("mouseup", stopVertexDrag);
+}
+
+function doVertexDrag(e) {
+  if (!vertexDrag) return;
+  const currentX = e.clientX;
+  const { part, vertex, side, startX, startDx } = vertexDrag;
+  const delta = side === "left" ? startX - currentX : currentX - startX;
+  vertex.dx = Math.max(0, startDx + delta);
+  updatePolygonShape(part);
+  updateVertexHandles(part);
+}
+
+function stopVertexDrag() {
+  window.removeEventListener("mousemove", doVertexDrag);
+  window.removeEventListener("mouseup", stopVertexDrag);
+  vertexDrag = null;
 }
 
 function removePart(part) {
@@ -459,13 +499,18 @@ function loadFromData(data) {
   if (!data.parts) return;
   data.parts.forEach((p) => {
     const g = document.createElementNS(svgNS, "g");
+    const shape = document.createElementNS(svgNS, "polygon");
+    shape.setAttribute("fill", p.color);
+    shape.classList.add("body-shape");
+    g.appendChild(shape);
+
     const rect = document.createElementNS(svgNS, "rect");
     rect.setAttribute("x", p.x);
     rect.setAttribute("y", p.y);
     rect.setAttribute("width", p.width);
     rect.setAttribute("height", p.height);
-    rect.setAttribute("fill", p.color);
-    rect.classList.add("rect");
+    rect.setAttribute("fill", "none");
+    rect.setAttribute("pointer-events", "none");
     g.appendChild(rect);
 
     const handle = document.createElementNS(svgNS, "rect");
@@ -549,11 +594,34 @@ function loadFromData(data) {
       });
     }
 
+    const symVertices = [];
+    const vertexHandles = [];
+    if (p.symVertices) {
+      p.symVertices.forEach((v) => {
+        const vertex = { y: v.y, dx: v.dx };
+        const hl = document.createElementNS(svgNS, "rect");
+        hl.setAttribute("width", 8);
+        hl.setAttribute("height", 8);
+        hl.classList.add("vertex-handle");
+        g.appendChild(hl);
+        const hr = document.createElementNS(svgNS, "rect");
+        hr.setAttribute("width", 8);
+        hr.setAttribute("height", 8);
+        hr.classList.add("vertex-handle");
+        g.appendChild(hr);
+        vertex.handleLeft = hl;
+        vertex.handleRight = hr;
+        symVertices.push(vertex);
+        vertexHandles.push(hl, hr);
+      });
+    }
+
     canvas.appendChild(g);
 
     const partData = {
       ...p,
       g,
+      shape,
       rect,
       handle,
       leftHandle,
@@ -564,8 +632,20 @@ function loadFromData(data) {
       height: p.height,
       specialIcon,
       specialForms,
+      symVertices,
+      vertexHandles,
     };
+    symVertices.forEach((v) => {
+      v.handleLeft.addEventListener("mousedown", (evt) =>
+        startVertexDrag(evt, partData, v, "left")
+      );
+      v.handleRight.addEventListener("mousedown", (evt) =>
+        startVertexDrag(evt, partData, v, "right")
+      );
+    });
     parts.push(partData);
+    updatePolygonShape(partData);
+    updateVertexHandles(partData);
     addPartEventListeners(partData);
   });
 }
