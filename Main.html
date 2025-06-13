@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fishing BHA Tool</title>
+
+  <!--  Apple-inspired minimalist styling -->
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- ────────────  MAIN MENU  ──────────── -->
+  <section id="main-page" class="view centered">
+    <h1>Fishing BHA Tool</h1>
+
+    <button id="loadBtn" class="primary">Load BHA</button>
+    <button id="newBtn"  class="secondary">New BHA</button>
+
+    <!-- hidden file picker -->
+    <input type="file" id="fileInput" accept="application/json" hidden />
+  </section>
+
+  <!-- ────────────  BUILDER VIEW  ──────────── -->
+  <section id="builder-page" class="view builder" hidden>
+    <!-- left: scrollable palette -->
+    <aside id="palette" class="sidebar">
+      <h2>Items</h2>
+      <div class="tool-item" draggable="true" data-tool='{"name":"Drill Bit","length":0.5,"od":8.5}'>
+        Drill Bit<br><small>8.5"&nbsp;/&nbsp;0.5 ft</small>
+      </div>
+      <div class="tool-item" draggable="true" data-tool='{"name":"Stabilizer","length":5,"od":6.375}'>
+        Stabilizer<br><small>Ø 6.375"&nbsp;/&nbsp;5 ft</small>
+      </div>
+      <div class="tool-item" draggable="true" data-tool='{"name":"Jar","length":10,"od":3}'>
+        Jar<br><small>Ø 3"&nbsp;/&nbsp;10 ft</small>
+      </div>
+      <!-- …add more items here … -->
+    </aside>
+
+    <!-- right: drop zone -->
+    <main id="dropZone" class="dropzone" ondragover="event.preventDefault()">
+      <h2>Assy 1</h2>
+      <!-- dropped components appear below -->
+    </main>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>
