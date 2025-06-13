@@ -3,6 +3,9 @@ const canvas = document.getElementById("diagramCanvas");
 const parts = [];
 let selectedPart = null;
 let copiedColor = null;
+let creatingSpecial = false,
+  specialSymmetry = false,
+  specialDraft = null;
 
 const APP_VERSION = "1.0";
 document.getElementById("version").textContent = APP_VERSION;
@@ -23,24 +26,10 @@ document.getElementById("addSpecial").addEventListener("click", () => {
     alert("Select a part first.");
     return;
   }
-  if (selectedPart.special) {
-    if (selectedPart.specialIcon) {
-      selectedPart.g.removeChild(selectedPart.specialIcon);
-    }
-    selectedPart.special = false;
-  } else {
-    const icon = document.createElementNS(svgNS, "rect");
-    const x = parseFloat(selectedPart.rect.getAttribute("x")) + selectedPart.width + 4;
-    const y = parseFloat(selectedPart.rect.getAttribute("y")) + selectedPart.height / 2 - 7;
-    icon.setAttribute("x", x);
-    icon.setAttribute("y", y);
-    icon.setAttribute("width", 14);
-    icon.setAttribute("height", 14);
-    icon.classList.add("special-placeholder");
-    selectedPart.g.appendChild(icon);
-    selectedPart.specialIcon = icon;
-    selectedPart.special = true;
-  }
+  if (creatingSpecial) return;
+  specialSymmetry = confirm("Create symmetrical form?");
+  creatingSpecial = true;
+  canvas.addEventListener("mousedown", startSpecialDraw);
 });
 
 document.getElementById("copyColor").addEventListener("click", () => {
@@ -68,6 +57,15 @@ document.getElementById("exportBtn").addEventListener("click", () => {
       topConnector: p.topConnector,
       bottomConnector: p.bottomConnector,
       special: p.special,
+      specialForms: (p.specialForms || []).map((f) => ({
+        x: parseFloat(f.rect.getAttribute("x")),
+        y: parseFloat(f.rect.getAttribute("y")),
+        width: parseFloat(f.rect.getAttribute("width")),
+        height: parseFloat(f.rect.getAttribute("height")),
+        rx: parseFloat(f.rect.getAttribute("rx")) || 0,
+        side: f.side,
+        symmetrical: !!f.rect2,
+      })),
     })),
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], {
@@ -157,6 +155,7 @@ function addBody() {
     topConnector: "none",
     bottomConnector: "none",
     special: false,
+    specialForms: [],
     g,
     rect,
     handle,
@@ -226,6 +225,91 @@ function handleConnectorToggle(evt, part) {
 }
 function nextState(s) {
   return s === "none" ? "PIN" : s === "PIN" ? "BOX" : "none";
+}
+
+// --- Special Feature Drawing ---
+function startSpecialDraw(e) {
+  if (!creatingSpecial || !selectedPart) return;
+  if (e.target !== selectedPart.rect) return;
+  const partX = selectedPart.x;
+  const partY = selectedPart.y;
+  const partW = selectedPart.width;
+  const partH = selectedPart.height;
+  const x = e.offsetX;
+  const y = e.offsetY;
+  const fromLeft = x - partX < partW / 2;
+  specialDraft = {
+    side: fromLeft ? "left" : "right",
+    startX: x,
+    startY: y,
+    rect: document.createElementNS(svgNS, "rect"),
+  };
+  const r = specialDraft.rect;
+  r.classList.add("special-form");
+  selectedPart.g.appendChild(r);
+  if (specialSymmetry) {
+    specialDraft.rect2 = document.createElementNS(svgNS, "rect");
+    specialDraft.rect2.classList.add("special-form");
+    selectedPart.g.appendChild(specialDraft.rect2);
+  }
+  canvas.addEventListener("mousemove", moveSpecialDraw);
+  window.addEventListener("mouseup", endSpecialDraw);
+}
+
+function moveSpecialDraw(e) {
+  if (!specialDraft) return;
+  const x = e.offsetX;
+  const y = e.offsetY;
+  const sx = specialDraft.startX;
+  const sy = specialDraft.startY;
+  const w = Math.abs(x - sx);
+  const h = Math.abs(y - sy);
+  const minX = Math.min(x, sx);
+  const minY = Math.min(y, sy);
+  if (specialDraft.side === "left") {
+    specialDraft.rect.setAttribute("x", sx - w);
+  } else {
+    specialDraft.rect.setAttribute("x", sx);
+  }
+  specialDraft.rect.setAttribute("y", minY);
+  specialDraft.rect.setAttribute("width", w);
+  specialDraft.rect.setAttribute("height", h);
+  if (specialDraft.rect2) {
+    const partX = selectedPart.x;
+    const center = partX + selectedPart.width / 2;
+    const dx = specialDraft.side === "left" ? center - (sx - w) - w : (sx + w) - center;
+    specialDraft.rect2.setAttribute("x", center + dx);
+    specialDraft.rect2.setAttribute("y", minY);
+    specialDraft.rect2.setAttribute("width", w);
+    specialDraft.rect2.setAttribute("height", h);
+  }
+}
+
+function endSpecialDraw() {
+  canvas.removeEventListener("mousemove", moveSpecialDraw);
+  window.removeEventListener("mouseup", endSpecialDraw);
+  creatingSpecial = false;
+  if (!selectedPart.specialForms) selectedPart.specialForms = [];
+  selectedPart.specialForms.push(specialDraft);
+  if (specialDraft.rect) {
+    specialDraft.rect.addEventListener("contextmenu", specialContext);
+  }
+  if (specialDraft.rect2) {
+    specialDraft.rect2.addEventListener("contextmenu", specialContext);
+  }
+  specialDraft = null;
+}
+
+function specialContext(e) {
+  e.preventDefault();
+  const action = prompt('Type "remove" to delete or enter roundness value');
+  if (!action) return;
+  if (action === "remove") {
+    if (e.target.parentNode) e.target.parentNode.removeChild(e.target);
+  } else {
+    e.target.setAttribute("rx", action);
+    e.target.setAttribute("ry", action);
+  }
 }
 function labelFor(s) {
   return s === "none" ? "" : s;
@@ -429,6 +513,42 @@ function loadFromData(data) {
       g.appendChild(specialIcon);
     }
 
+    const specialForms = [];
+    if (p.specialForms) {
+      p.specialForms.forEach((sf) => {
+        const r = document.createElementNS(svgNS, "rect");
+        r.setAttribute("x", sf.x);
+        r.setAttribute("y", sf.y);
+        r.setAttribute("width", sf.width);
+        r.setAttribute("height", sf.height);
+        if (sf.rx) {
+          r.setAttribute("rx", sf.rx);
+          r.setAttribute("ry", sf.rx);
+        }
+        r.classList.add("special-form");
+        g.appendChild(r);
+        r.addEventListener("contextmenu", specialContext);
+        let r2 = null;
+        if (sf.symmetrical) {
+          r2 = document.createElementNS(svgNS, "rect");
+          const center = p.x + p.width / 2;
+          const dx = sf.side === "left" ? center - sf.x - sf.width : sf.x - center;
+          r2.setAttribute("x", center + dx);
+          r2.setAttribute("y", sf.y);
+          r2.setAttribute("width", sf.width);
+          r2.setAttribute("height", sf.height);
+          if (sf.rx) {
+            r2.setAttribute("rx", sf.rx);
+            r2.setAttribute("ry", sf.rx);
+          }
+          r2.classList.add("special-form");
+          g.appendChild(r2);
+          r2.addEventListener("contextmenu", specialContext);
+        }
+        specialForms.push({ rect: r, rect2: r2, side: sf.side });
+      });
+    }
+
     canvas.appendChild(g);
 
     const partData = {
@@ -443,6 +563,7 @@ function loadFromData(data) {
       width: p.width,
       height: p.height,
       specialIcon,
+      specialForms,
     };
     parts.push(partData);
     addPartEventListeners(partData);
