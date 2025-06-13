@@ -4,7 +4,6 @@ const parts = [];
 let selectedPart = null;
 let copiedColor = null;
 
-
 // --- Toolbar buttons ---
 document.getElementById("addBody").addEventListener("click", addBody);
 
@@ -39,7 +38,6 @@ document.getElementById("addSpecial").addEventListener("click", () => {
     selectedPart.special = true;
   }
 });
-
 
 document.getElementById("copyColor").addEventListener("click", () => {
   if (selectedPart) {
@@ -205,7 +203,6 @@ function selectPart(part) {
 }
 
 function handleConnectorToggle(evt, part) {
-  if (!connectorMode) return;
   const y = evt.offsetY;
   const rectY = parseFloat(part.rect.getAttribute("y"));
   const h = parseFloat(part.rect.getAttribute("height"));
