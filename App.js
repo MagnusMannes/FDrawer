@@ -2,6 +2,8 @@ const svgNS = "http://www.w3.org/2000/svg";
 const canvas = document.getElementById("diagramCanvas");
 const parts = [];
 let selectedPart = null;
+let copiedColor = null;
+let connectorMode = false;
 
 // --- Toolbar buttons ---
 document.getElementById("addBody").addEventListener("click", addBody);
@@ -35,6 +37,26 @@ document.getElementById("addSpecial").addEventListener("click", () => {
     selectedPart.g.appendChild(icon);
     selectedPart.specialIcon = icon;
     selectedPart.special = true;
+  }
+});
+
+document.getElementById("copyColor").addEventListener("click", () => {
+  if (selectedPart) {
+    copiedColor = selectedPart.color;
+  }
+});
+
+const toggleConnectorBtn = document.getElementById("toggleConnector");
+toggleConnectorBtn.addEventListener("click", () => {
+  connectorMode = !connectorMode;
+  toggleConnectorBtn.classList.toggle("active", connectorMode);
+});
+
+document.getElementById("pasteColor").addEventListener("click", () => {
+  if (selectedPart && copiedColor) {
+    selectedPart.color = copiedColor;
+    selectedPart.rect.setAttribute("fill", copiedColor);
+    document.getElementById("colorPicker").value = copiedColor;
   }
 });
 
@@ -106,6 +128,22 @@ function addBody() {
   handle.classList.add("handle");
   g.appendChild(handle);
 
+  const leftHandle = document.createElementNS(svgNS, "rect");
+  leftHandle.setAttribute("width", 10);
+  leftHandle.setAttribute("height", 10);
+  leftHandle.setAttribute("x", x - 5);
+  leftHandle.setAttribute("y", y + height / 2 - 5);
+  leftHandle.classList.add("h-handle");
+  g.appendChild(leftHandle);
+
+  const rightHandle = document.createElementNS(svgNS, "rect");
+  rightHandle.setAttribute("width", 10);
+  rightHandle.setAttribute("height", 10);
+  rightHandle.setAttribute("x", x + width - 5);
+  rightHandle.setAttribute("y", y + height / 2 - 5);
+  rightHandle.classList.add("h-handle");
+  g.appendChild(rightHandle);
+
   const topLabel = createConnectorLabel(x + width / 2, y - 6);
   const bottomLabel = createConnectorLabel(x + width / 2, y + height + 6);
   g.appendChild(topLabel);
@@ -125,6 +163,8 @@ function addBody() {
     g,
     rect,
     handle,
+    leftHandle,
+    rightHandle,
     topLabel,
     bottomLabel,
   };
@@ -153,6 +193,10 @@ function addPartEventListeners(part) {
     (e) => startResize(e, part),
     { passive: false }
   );
+  part.leftHandle.addEventListener("mousedown", (e) => startHResize(e, part, "left"));
+  part.leftHandle.addEventListener("touchstart", (e) => startHResize(e, part, "left"), { passive: false });
+  part.rightHandle.addEventListener("mousedown", (e) => startHResize(e, part, "right"));
+  part.rightHandle.addEventListener("touchstart", (e) => startHResize(e, part, "right"), { passive: false });
 }
 
 // --- Selection & Connector Logic ---
@@ -166,15 +210,18 @@ function selectPart(part) {
 }
 
 function handleConnectorToggle(evt, part) {
+  if (!connectorMode) return;
   const y = evt.offsetY;
   const rectY = parseFloat(part.rect.getAttribute("y"));
   const h = parseFloat(part.rect.getAttribute("height"));
   if (y < rectY + 10) {
     part.topConnector = nextState(part.topConnector);
     part.topLabel.textContent = labelFor(part.topConnector);
+    updateConnectorLabelClass(part.topLabel, part.topConnector);
   } else if (y > rectY + h - 10) {
     part.bottomConnector = nextState(part.bottomConnector);
     part.bottomLabel.textContent = labelFor(part.bottomConnector);
+    updateConnectorLabelClass(part.bottomLabel, part.bottomConnector);
   }
 }
 function nextState(s) {
@@ -182,6 +229,10 @@ function nextState(s) {
 }
 function labelFor(s) {
   return s === "none" ? "" : s;
+}
+function updateConnectorLabelClass(label, state) {
+  if (state === "none") label.classList.remove("active");
+  else label.classList.add("active");
 }
 
 // --- Resize Logic ---
@@ -208,6 +259,8 @@ function doResize(e) {
   resizePart.height = newH;
   resizePart.rect.setAttribute("height", newH);
   resizePart.handle.setAttribute("y", resizePart.y + newH - 5);
+  resizePart.leftHandle.setAttribute("y", resizePart.y + newH / 2 - 5);
+  resizePart.rightHandle.setAttribute("y", resizePart.y + newH / 2 - 5);
   resizePart.bottomLabel.setAttribute("y", resizePart.y + newH + 6);
 
   const idx = parts.indexOf(resizePart);
@@ -216,6 +269,8 @@ function doResize(e) {
     parts[i].y = baseY;
     parts[i].rect.setAttribute("y", baseY);
     parts[i].handle.setAttribute("y", baseY + parts[i].height - 5);
+    parts[i].leftHandle.setAttribute("y", baseY + parts[i].height / 2 - 5);
+    parts[i].rightHandle.setAttribute("y", baseY + parts[i].height / 2 - 5);
     parts[i].topLabel.setAttribute("y", baseY - 6);
     parts[i].bottomLabel.setAttribute("y", baseY + parts[i].height + 6);
     if (parts[i].specialIcon) {
@@ -230,6 +285,58 @@ function stopResize() {
   window.removeEventListener("touchmove", doResize);
   window.removeEventListener("mouseup", stopResize);
   window.removeEventListener("touchend", stopResize);
+}
+
+// --- Horizontal Resize Logic ---
+let hResizing = false,
+  startX = 0,
+  startWidth = 0,
+  hResizePart = null,
+  hDir = "left",
+  centerX = 0;
+function startHResize(e, part, dir) {
+  e.preventDefault();
+  hResizing = true;
+  startX = e.touches ? e.touches[0].clientX : e.clientX;
+  startWidth = part.width;
+  hResizePart = part;
+  hDir = dir;
+  centerX = part.x + part.width / 2;
+  window.addEventListener("mousemove", doHResize);
+  window.addEventListener("touchmove", doHResize, { passive: false });
+  window.addEventListener("mouseup", stopHResize);
+  window.addEventListener("touchend", stopHResize);
+}
+function doHResize(e) {
+  if (!hResizing) return;
+  const currentX = e.touches ? e.touches[0].clientX : e.clientX;
+  const delta = hDir === "left" ? startX - currentX : currentX - startX;
+  const newW = Math.max(30, startWidth + delta * 2);
+  hResizePart.width = newW;
+  hResizePart.x = centerX - newW / 2;
+  updatePartWidth(hResizePart);
+}
+function stopHResize() {
+  hResizing = false;
+  window.removeEventListener("mousemove", doHResize);
+  window.removeEventListener("touchmove", doHResize);
+  window.removeEventListener("mouseup", stopHResize);
+  window.removeEventListener("touchend", stopHResize);
+}
+
+function updatePartWidth(part) {
+  part.rect.setAttribute("x", part.x);
+  part.rect.setAttribute("width", part.width);
+  part.handle.setAttribute("x", part.x + part.width / 2 - 5);
+  part.leftHandle.setAttribute("x", part.x - 5);
+  part.leftHandle.setAttribute("y", part.y + part.height / 2 - 5);
+  part.rightHandle.setAttribute("x", part.x + part.width - 5);
+  part.rightHandle.setAttribute("y", part.y + part.height / 2 - 5);
+  part.topLabel.setAttribute("x", part.x + part.width / 2);
+  part.bottomLabel.setAttribute("x", part.x + part.width / 2);
+  if (part.specialIcon) {
+    part.specialIcon.setAttribute("x", part.x + part.width + 4);
+  }
 }
 
 // --- Import Logic ---
@@ -260,12 +367,30 @@ function loadFromData(data) {
     handle.classList.add("handle");
     g.appendChild(handle);
 
+    const leftHandle = document.createElementNS(svgNS, "rect");
+    leftHandle.setAttribute("width", 10);
+    leftHandle.setAttribute("height", 10);
+    leftHandle.setAttribute("x", p.x - 5);
+    leftHandle.setAttribute("y", p.y + p.height / 2 - 5);
+    leftHandle.classList.add("h-handle");
+    g.appendChild(leftHandle);
+
+    const rightHandle = document.createElementNS(svgNS, "rect");
+    rightHandle.setAttribute("width", 10);
+    rightHandle.setAttribute("height", 10);
+    rightHandle.setAttribute("x", p.x + p.width - 5);
+    rightHandle.setAttribute("y", p.y + p.height / 2 - 5);
+    rightHandle.classList.add("h-handle");
+    g.appendChild(rightHandle);
+
     const topLabel = createConnectorLabel(p.x + p.width / 2, p.y - 6);
     topLabel.textContent = labelFor(p.topConnector);
+    updateConnectorLabelClass(topLabel, p.topConnector);
     g.appendChild(topLabel);
 
     const bottomLabel = createConnectorLabel(p.x + p.width / 2, p.y + p.height + 6);
     bottomLabel.textContent = labelFor(p.bottomConnector);
+    updateConnectorLabelClass(bottomLabel, p.bottomConnector);
     g.appendChild(bottomLabel);
 
     let specialIcon = null;
@@ -286,6 +411,8 @@ function loadFromData(data) {
       g,
       rect,
       handle,
+      leftHandle,
+      rightHandle,
       topLabel,
       bottomLabel,
       width: p.width,
