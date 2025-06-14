@@ -1,5 +1,6 @@
 const svgNS = "http://www.w3.org/2000/svg";
 const canvas = document.getElementById("diagramCanvas");
+canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 const parts = [];
 let selectedPart = null;
 let copiedColor = null;
@@ -200,7 +201,7 @@ function addPartEventListeners(part) {
     toggleSpecialVertex(e, part);
   });
   part.g.addEventListener("contextmenu", (e) => {
-    e.preventDefault();
+
     showContextMenu(e, part);
   });
   part.handle.addEventListener("mousedown", (e) => startResize(e, part));
@@ -498,10 +499,7 @@ function removePart(part) {
 }
 
 function showContextMenu(e, part) {
-  contextPart = part;
-  const menu = document.getElementById("contextMenu");
-  menu.style.left = `${e.pageX}px`;
-  menu.style.top = `${e.pageY}px`;
+
   menu.style.display = "block";
 }
 
