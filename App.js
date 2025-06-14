@@ -4,11 +4,13 @@ canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 const parts = [];
 let selectedPart = null;
 let copiedColor = null;
+let copiedShape = null;
 let contextPart = null;
+const menu = document.getElementById("contextMenu");
 
 const APP_VERSION = "1.0";
 document.getElementById("version").textContent = APP_VERSION;
-document.getElementById("lastUpdated").textContent = document.lastModified.split(" ")[0];
+document.getElementById("lastUpdated").textContent = new Date(document.lastModified).toLocaleString();
 
 // --- Toolbar buttons ---
 document.getElementById("addBody").addEventListener("click", addBody);
@@ -38,11 +40,40 @@ document.getElementById("pasteColor").addEventListener("click", () => {
 document.getElementById("removeBody").addEventListener("click", () => {
   if (contextPart) removePart(contextPart);
   contextPart = null;
-  document.getElementById("contextMenu").style.display = "none";
+  menu.style.display = "none";
+});
+
+document.getElementById("copyColorMenu").addEventListener("click", () => {
+  if (contextPart) copiedColor = contextPart.color;
+  menu.style.display = "none";
+});
+
+document.getElementById("pasteColorMenu").addEventListener("click", () => {
+  if (contextPart && copiedColor) {
+    contextPart.color = copiedColor;
+    contextPart.shape.setAttribute("fill", copiedColor);
+    document.getElementById("colorPicker").value = copiedColor;
+  }
+  menu.style.display = "none";
+});
+
+document.getElementById("copyShapeMenu").addEventListener("click", () => {
+  if (contextPart) copiedShape = exportPart(contextPart);
+  menu.style.display = "none";
+});
+
+document.getElementById("pasteShapeMenu").addEventListener("click", () => {
+  if (copiedShape) {
+    const data = JSON.parse(JSON.stringify(copiedShape));
+    data.x += 10;
+    data.y += 10;
+    createPartFromData(data);
+  }
+  menu.style.display = "none";
 });
 
 document.addEventListener("click", () => {
-  document.getElementById("contextMenu").style.display = "none";
+  menu.style.display = "none";
   contextPart = null;
 });
 
@@ -179,7 +210,187 @@ function addBody() {
   };
   parts.push(part);
   addPartEventListeners(part);
+  toggleHandles(part, false);
   selectPart(part);
+}
+
+function exportPart(part) {
+  return {
+    x: part.x,
+    y: part.y,
+    width: part.width,
+    height: part.height,
+    color: part.color,
+    topConnector: part.topConnector,
+    bottomConnector: part.bottomConnector,
+    special: part.special,
+    specialForms: (part.specialForms || []).map((f) => ({
+      x: parseFloat(f.rect.getAttribute("x")),
+      y: parseFloat(f.rect.getAttribute("y")),
+      width: parseFloat(f.rect.getAttribute("width")),
+      height: parseFloat(f.rect.getAttribute("height")),
+      rx: parseFloat(f.rect.getAttribute("rx")) || 0,
+      side: f.side,
+      symmetrical: !!f.rect2,
+    })),
+    symVertices: (part.symVertices || []).map((v) => ({ y: v.y, dx: v.dx })),
+  };
+}
+
+function createPartFromData(p) {
+  const g = document.createElementNS(svgNS, "g");
+  const shape = document.createElementNS(svgNS, "polygon");
+  shape.setAttribute("fill", p.color);
+  shape.classList.add("body-shape");
+  g.appendChild(shape);
+
+  const rect = document.createElementNS(svgNS, "rect");
+  rect.setAttribute("x", p.x);
+  rect.setAttribute("y", p.y);
+  rect.setAttribute("width", p.width);
+  rect.setAttribute("height", p.height);
+  rect.setAttribute("fill", "none");
+  rect.setAttribute("pointer-events", "none");
+  g.appendChild(rect);
+
+  const handle = document.createElementNS(svgNS, "rect");
+  handle.setAttribute("width", 10);
+  handle.setAttribute("height", 10);
+  handle.setAttribute("x", p.x + p.width / 2 - 5);
+  handle.setAttribute("y", p.y + p.height - 5);
+  handle.classList.add("handle");
+  g.appendChild(handle);
+
+  const leftHandle = document.createElementNS(svgNS, "rect");
+  leftHandle.setAttribute("width", 10);
+  leftHandle.setAttribute("height", 10);
+  leftHandle.setAttribute("x", p.x - 5);
+  leftHandle.setAttribute("y", p.y + p.height / 2 - 5);
+  leftHandle.classList.add("h-handle");
+  g.appendChild(leftHandle);
+
+  const rightHandle = document.createElementNS(svgNS, "rect");
+  rightHandle.setAttribute("width", 10);
+  rightHandle.setAttribute("height", 10);
+  rightHandle.setAttribute("x", p.x + p.width - 5);
+  rightHandle.setAttribute("y", p.y + p.height / 2 - 5);
+  rightHandle.classList.add("h-handle");
+  g.appendChild(rightHandle);
+
+  const topLabel = createConnectorLabel(p.x + p.width / 2, p.y - 6);
+  topLabel.textContent = labelFor(p.topConnector);
+  updateConnectorLabelClass(topLabel, p.topConnector);
+  g.appendChild(topLabel);
+
+  const bottomLabel = createConnectorLabel(p.x + p.width / 2, p.y + p.height + 6);
+  bottomLabel.textContent = labelFor(p.bottomConnector);
+  updateConnectorLabelClass(bottomLabel, p.bottomConnector);
+  g.appendChild(bottomLabel);
+
+  let specialIcon = null;
+  if (p.special) {
+    specialIcon = document.createElementNS(svgNS, "rect");
+    specialIcon.setAttribute("x", p.x + p.width + 4);
+    specialIcon.setAttribute("y", p.y + p.height / 2 - 7);
+    specialIcon.setAttribute("width", 14);
+    specialIcon.setAttribute("height", 14);
+    specialIcon.classList.add("special-placeholder");
+    g.appendChild(specialIcon);
+  }
+
+  const specialForms = [];
+  if (p.specialForms) {
+    p.specialForms.forEach((sf) => {
+      const r = document.createElementNS(svgNS, "rect");
+      r.setAttribute("x", sf.x);
+      r.setAttribute("y", sf.y);
+      r.setAttribute("width", sf.width);
+      r.setAttribute("height", sf.height);
+      if (sf.rx) {
+        r.setAttribute("rx", sf.rx);
+        r.setAttribute("ry", sf.rx);
+      }
+      r.classList.add("special-form");
+      g.appendChild(r);
+      r.addEventListener("contextmenu", specialContext);
+      let r2 = null;
+      if (sf.symmetrical) {
+        r2 = document.createElementNS(svgNS, "rect");
+        const center = p.x + p.width / 2;
+        const dx = sf.side === "left" ? center - sf.x - sf.width : sf.x - center;
+        r2.setAttribute("x", center + dx);
+        r2.setAttribute("y", sf.y);
+        r2.setAttribute("width", sf.width);
+        r2.setAttribute("height", sf.height);
+        if (sf.rx) {
+          r2.setAttribute("rx", sf.rx);
+          r2.setAttribute("ry", sf.rx);
+        }
+        r2.classList.add("special-form");
+        g.appendChild(r2);
+        r2.addEventListener("contextmenu", specialContext);
+      }
+      specialForms.push({ rect: r, rect2: r2, side: sf.side });
+    });
+  }
+
+  const symVertices = [];
+  const vertexHandles = [];
+  if (p.symVertices) {
+    p.symVertices.forEach((v) => {
+      const vertex = { y: v.y, dx: v.dx };
+      const hl = document.createElementNS(svgNS, "rect");
+      hl.setAttribute("width", 8);
+      hl.setAttribute("height", 8);
+      hl.classList.add("vertex-handle");
+      g.appendChild(hl);
+      const hr = document.createElementNS(svgNS, "rect");
+      hr.setAttribute("width", 8);
+      hr.setAttribute("height", 8);
+      hr.classList.add("vertex-handle");
+      g.appendChild(hr);
+      vertex.handleLeft = hl;
+      vertex.handleRight = hr;
+      symVertices.push(vertex);
+      vertexHandles.push(hl, hr);
+    });
+  }
+
+  canvas.appendChild(g);
+
+  const partData = {
+    ...p,
+    g,
+    shape,
+    rect,
+    handle,
+    leftHandle,
+    rightHandle,
+    topLabel,
+    bottomLabel,
+    width: p.width,
+    height: p.height,
+    specialIcon,
+    specialForms,
+    symVertices,
+    vertexHandles,
+  };
+
+  symVertices.forEach((v) => {
+    v.handleLeft.addEventListener("mousedown", (evt) =>
+      startVertexDrag(evt, partData, v, "left")
+    );
+    v.handleRight.addEventListener("mousedown", (evt) =>
+      startVertexDrag(evt, partData, v, "right")
+    );
+  });
+
+  parts.push(partData);
+  updatePolygonShape(partData);
+  updateVertexHandles(partData);
+  addPartEventListeners(partData);
+  toggleHandles(partData, false);
+  return partData;
 }
 
 function createConnectorLabel(x, y) {
@@ -219,6 +430,7 @@ function addPartEventListeners(part) {
 // --- Selection & Connector Logic ---
 function selectPart(part) {
   if (selectedPart) {
+    toggleHandles(selectedPart, false);
     selectedPart.rect.classList.remove("selected");
     if (selectedPart.shape) selectedPart.shape.classList.remove("selected");
   }
@@ -226,6 +438,7 @@ function selectPart(part) {
   part.rect.classList.add("selected");
   if (part.shape) part.shape.classList.add("selected");
   document.getElementById("colorPicker").value = part.color;
+  toggleHandles(part, true);
 }
 
 function handleConnectorToggle(evt, part) {
@@ -449,6 +662,16 @@ function updateVertexHandles(part) {
   });
 }
 
+function toggleHandles(part, show) {
+  const display = show ? "block" : "none";
+  part.handle.style.display = display;
+  part.leftHandle.style.display = display;
+  part.rightHandle.style.display = display;
+  if (part.vertexHandles) {
+    part.vertexHandles.forEach((h) => (h.style.display = display));
+  }
+}
+
 let vertexDrag = null;
 function startVertexDrag(e, part, vertex, side) {
   e.preventDefault();
@@ -499,7 +722,10 @@ function removePart(part) {
 }
 
 function showContextMenu(e, part) {
-
+  e.preventDefault();
+  contextPart = part;
+  menu.style.left = `${e.clientX}px`;
+  menu.style.top = `${e.clientY}px`;
   menu.style.display = "block";
 }
 
@@ -513,154 +739,6 @@ function loadFromData(data) {
   clearCanvas();
   if (!data.parts) return;
   data.parts.forEach((p) => {
-    const g = document.createElementNS(svgNS, "g");
-    const shape = document.createElementNS(svgNS, "polygon");
-    shape.setAttribute("fill", p.color);
-    shape.classList.add("body-shape");
-    g.appendChild(shape);
-
-    const rect = document.createElementNS(svgNS, "rect");
-    rect.setAttribute("x", p.x);
-    rect.setAttribute("y", p.y);
-    rect.setAttribute("width", p.width);
-    rect.setAttribute("height", p.height);
-    rect.setAttribute("fill", "none");
-    rect.setAttribute("pointer-events", "none");
-    g.appendChild(rect);
-
-    const handle = document.createElementNS(svgNS, "rect");
-    handle.setAttribute("width", 10);
-    handle.setAttribute("height", 10);
-    handle.setAttribute("x", p.x + p.width / 2 - 5);
-    handle.setAttribute("y", p.y + p.height - 5);
-    handle.classList.add("handle");
-    g.appendChild(handle);
-
-    const leftHandle = document.createElementNS(svgNS, "rect");
-    leftHandle.setAttribute("width", 10);
-    leftHandle.setAttribute("height", 10);
-    leftHandle.setAttribute("x", p.x - 5);
-    leftHandle.setAttribute("y", p.y + p.height / 2 - 5);
-    leftHandle.classList.add("h-handle");
-    g.appendChild(leftHandle);
-
-    const rightHandle = document.createElementNS(svgNS, "rect");
-    rightHandle.setAttribute("width", 10);
-    rightHandle.setAttribute("height", 10);
-    rightHandle.setAttribute("x", p.x + p.width - 5);
-    rightHandle.setAttribute("y", p.y + p.height / 2 - 5);
-    rightHandle.classList.add("h-handle");
-    g.appendChild(rightHandle);
-
-    const topLabel = createConnectorLabel(p.x + p.width / 2, p.y - 6);
-    topLabel.textContent = labelFor(p.topConnector);
-    updateConnectorLabelClass(topLabel, p.topConnector);
-    g.appendChild(topLabel);
-
-    const bottomLabel = createConnectorLabel(p.x + p.width / 2, p.y + p.height + 6);
-    bottomLabel.textContent = labelFor(p.bottomConnector);
-    updateConnectorLabelClass(bottomLabel, p.bottomConnector);
-    g.appendChild(bottomLabel);
-
-    let specialIcon = null;
-    if (p.special) {
-      specialIcon = document.createElementNS(svgNS, "rect");
-      specialIcon.setAttribute("x", p.x + p.width + 4);
-      specialIcon.setAttribute("y", p.y + p.height / 2 - 7);
-      specialIcon.setAttribute("width", 14);
-      specialIcon.setAttribute("height", 14);
-      specialIcon.classList.add("special-placeholder");
-      g.appendChild(specialIcon);
-    }
-
-    const specialForms = [];
-    if (p.specialForms) {
-      p.specialForms.forEach((sf) => {
-        const r = document.createElementNS(svgNS, "rect");
-        r.setAttribute("x", sf.x);
-        r.setAttribute("y", sf.y);
-        r.setAttribute("width", sf.width);
-        r.setAttribute("height", sf.height);
-        if (sf.rx) {
-          r.setAttribute("rx", sf.rx);
-          r.setAttribute("ry", sf.rx);
-        }
-        r.classList.add("special-form");
-        g.appendChild(r);
-        r.addEventListener("contextmenu", specialContext);
-        let r2 = null;
-        if (sf.symmetrical) {
-          r2 = document.createElementNS(svgNS, "rect");
-          const center = p.x + p.width / 2;
-          const dx = sf.side === "left" ? center - sf.x - sf.width : sf.x - center;
-          r2.setAttribute("x", center + dx);
-          r2.setAttribute("y", sf.y);
-          r2.setAttribute("width", sf.width);
-          r2.setAttribute("height", sf.height);
-          if (sf.rx) {
-            r2.setAttribute("rx", sf.rx);
-            r2.setAttribute("ry", sf.rx);
-          }
-          r2.classList.add("special-form");
-          g.appendChild(r2);
-          r2.addEventListener("contextmenu", specialContext);
-        }
-        specialForms.push({ rect: r, rect2: r2, side: sf.side });
-      });
-    }
-
-    const symVertices = [];
-    const vertexHandles = [];
-    if (p.symVertices) {
-      p.symVertices.forEach((v) => {
-        const vertex = { y: v.y, dx: v.dx };
-        const hl = document.createElementNS(svgNS, "rect");
-        hl.setAttribute("width", 8);
-        hl.setAttribute("height", 8);
-        hl.classList.add("vertex-handle");
-        g.appendChild(hl);
-        const hr = document.createElementNS(svgNS, "rect");
-        hr.setAttribute("width", 8);
-        hr.setAttribute("height", 8);
-        hr.classList.add("vertex-handle");
-        g.appendChild(hr);
-        vertex.handleLeft = hl;
-        vertex.handleRight = hr;
-        symVertices.push(vertex);
-        vertexHandles.push(hl, hr);
-      });
-    }
-
-    canvas.appendChild(g);
-
-    const partData = {
-      ...p,
-      g,
-      shape,
-      rect,
-      handle,
-      leftHandle,
-      rightHandle,
-      topLabel,
-      bottomLabel,
-      width: p.width,
-      height: p.height,
-      specialIcon,
-      specialForms,
-      symVertices,
-      vertexHandles,
-    };
-    symVertices.forEach((v) => {
-      v.handleLeft.addEventListener("mousedown", (evt) =>
-        startVertexDrag(evt, partData, v, "left")
-      );
-      v.handleRight.addEventListener("mousedown", (evt) =>
-        startVertexDrag(evt, partData, v, "right")
-      );
-    });
-    parts.push(partData);
-    updatePolygonShape(partData);
-    updateVertexHandles(partData);
-    addPartEventListeners(partData);
+    createPartFromData(p);
   });
 }

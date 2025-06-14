@@ -17,6 +17,7 @@ svg{width:100%;height:100%;background:#fff;}
 .body-shape{pointer-events:auto;}
 .body-shape.selected{stroke:#0074d9;stroke-width:2;fill-opacity:.8;}
 .vertex-handle{fill:#00f;cursor:move;}
+.handle,.h-handle,.vertex-handle{display:none;}
 .context-menu{position:absolute;display:none;background:#fff;border:1px solid #ccc;list-style:none;padding:0;margin:0;z-index:1000;}
 .context-menu-item{padding:4px 8px;cursor:pointer;white-space:nowrap;}
 .context-menu-item:hover{background:#eee;}
