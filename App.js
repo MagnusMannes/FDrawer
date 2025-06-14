@@ -1,12 +1,16 @@
 const svgNS = "http://www.w3.org/2000/svg";
 const canvas = document.getElementById("diagramCanvas");
-canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+canvas.addEventListener("contextmenu", (e) => {
+  e.preventDefault();
+  showContextMenu(e, null);
+});
 const parts = [];
 let selectedPart = null;
 let copiedColor = null;
 let copiedShape = null;
 let contextPart = null;
 const menu = document.getElementById("contextMenu");
+let zoom = 1;
 
 const APP_VERSION = "1.0";
 document.getElementById("version").textContent = APP_VERSION;
@@ -14,6 +18,25 @@ document.getElementById("lastUpdated").textContent = new Date(document.lastModif
 
 // --- Toolbar buttons ---
 document.getElementById("addBody").addEventListener("click", addBody);
+
+const toggleConnectorBtn = document.getElementById("toggleConnector");
+let connectorMode = false;
+toggleConnectorBtn.addEventListener("click", () => {
+  connectorMode = !connectorMode;
+  toggleConnectorBtn.classList.toggle("active", connectorMode);
+});
+
+canvas.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  if (e.deltaY < 0) zoom = Math.min(3, zoom + 0.1);
+  else zoom = Math.max(0.5, zoom - 0.1);
+  updateZoom();
+});
+
+function updateZoom() {
+  canvas.style.transformOrigin = "0 0";
+  canvas.style.transform = `scale(${zoom})`;
+}
 
 document.getElementById("colorPicker").addEventListener("input", (e) => {
   if (selectedPart) {
@@ -70,6 +93,13 @@ document.getElementById("pasteShapeMenu").addEventListener("click", () => {
     createPartFromData(data);
   }
   menu.style.display = "none";
+});
+
+document.getElementById("resetView").addEventListener("click", () => {
+  zoom = 1;
+  updateZoom();
+  menu.style.display = "none";
+  contextPart = null;
 });
 
 document.addEventListener("click", () => {
@@ -405,7 +435,7 @@ function createConnectorLabel(x, y) {
 function addPartEventListeners(part) {
   part.shape.addEventListener("click", (e) => {
     selectPart(part);
-    handleConnectorToggle(e, part);
+    if (connectorMode) handleConnectorToggle(e, part);
   });
   part.shape.addEventListener("dblclick", (e) => {
     selectPart(part);
