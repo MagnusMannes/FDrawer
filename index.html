@@ -16,7 +16,6 @@
     </label>
       <button id="copyColor" class="tool">Copy colour</button>
       <button id="pasteColor" class="tool">Paste colour</button>
-      <button id="addSpecial" class="tool">Add special feature</button>
       <div style="flex:1"></div>
       <button id="importBtn" class="tool">Import</button>
       <input type="file" id="fileInput" accept="application/json" style="display:none">
@@ -28,6 +27,9 @@
     </div>
   <div id="canvas_area">
     <svg id="diagramCanvas"></svg>
+    <ul id="contextMenu" class="context-menu">
+      <li id="removeBody" class="context-menu-item">Remove body</li>
+    </ul>
   </div>
 </div>
 <script src="App.js"></script>
