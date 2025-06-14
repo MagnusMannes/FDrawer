@@ -3,8 +3,7 @@ const canvas = document.getElementById("diagramCanvas");
 const parts = [];
 let selectedPart = null;
 let copiedColor = null;
-let creatingSpecial = false,
-  specialSymmetry = false;
+let contextPart = null;
 
 const APP_VERSION = "1.0";
 document.getElementById("version").textContent = APP_VERSION;
@@ -20,16 +19,6 @@ document.getElementById("colorPicker").addEventListener("input", (e) => {
   }
 });
 
-document.getElementById("addSpecial").addEventListener("click", () => {
-  if (!selectedPart) {
-    alert("Select a part first.");
-    return;
-  }
-  if (creatingSpecial) return;
-  specialSymmetry = confirm("Create symmetrical form?");
-  creatingSpecial = true;
-  canvas.addEventListener("mousedown", startSpecialDraw);
-});
 
 document.getElementById("copyColor").addEventListener("click", () => {
   if (selectedPart) {
@@ -43,6 +32,17 @@ document.getElementById("pasteColor").addEventListener("click", () => {
     selectedPart.shape.setAttribute("fill", copiedColor);
     document.getElementById("colorPicker").value = copiedColor;
   }
+});
+
+document.getElementById("removeBody").addEventListener("click", () => {
+  if (contextPart) removePart(contextPart);
+  contextPart = null;
+  document.getElementById("contextMenu").style.display = "none";
+});
+
+document.addEventListener("click", () => {
+  document.getElementById("contextMenu").style.display = "none";
+  contextPart = null;
 });
 
 document.getElementById("exportBtn").addEventListener("click", () => {
@@ -195,9 +195,13 @@ function addPartEventListeners(part) {
     selectPart(part);
     handleConnectorToggle(e, part);
   });
+  part.shape.addEventListener("dblclick", (e) => {
+    selectPart(part);
+    toggleSpecialVertex(e, part);
+  });
   part.g.addEventListener("contextmenu", (e) => {
     e.preventDefault();
-    removePart(part);
+    showContextMenu(e, part);
   });
   part.handle.addEventListener("mousedown", (e) => startResize(e, part));
   part.handle.addEventListener(
@@ -241,35 +245,40 @@ function nextState(s) {
   return s === "none" ? "PIN" : s === "PIN" ? "BOX" : "none";
 }
 
-// --- Special Feature Drawing ---
-function startSpecialDraw(e) {
-  if (!creatingSpecial || !selectedPart) return;
-  if (e.target !== selectedPart.shape) return;
-  const part = selectedPart;
+// --- Special Feature Toggling ---
+function toggleSpecialVertex(e, part) {
   const offsetY = e.offsetY - part.y;
-  const vertex = { y: offsetY, dx: 0 };
-  part.symVertices.push(vertex);
-  const hl = document.createElementNS(svgNS, "rect");
-  hl.setAttribute("width", 8);
-  hl.setAttribute("height", 8);
-  hl.classList.add("vertex-handle");
-  part.g.appendChild(hl);
-  hl.addEventListener("mousedown", (evt) => startVertexDrag(evt, part, vertex, "left"));
-  const hr = document.createElementNS(svgNS, "rect");
-  hr.setAttribute("width", 8);
-  hr.setAttribute("height", 8);
-  hr.classList.add("vertex-handle");
-  part.g.appendChild(hr);
-  hr.addEventListener("mousedown", (evt) => startVertexDrag(evt, part, vertex, "right"));
-  vertex.handleLeft = hl;
-  vertex.handleRight = hr;
-  part.vertexHandles.push(hl, hr);
+  const existingIndex = part.symVertices.findIndex((v) => Math.abs(v.y - offsetY) < 5);
+  if (existingIndex !== -1) {
+    const vertex = part.symVertices.splice(existingIndex, 1)[0];
+    if (vertex.handleLeft) vertex.handleLeft.remove();
+    if (vertex.handleRight) vertex.handleRight.remove();
+    part.vertexHandles = part.vertexHandles.filter(
+      (h) => h !== vertex.handleLeft && h !== vertex.handleRight
+    );
+  } else {
+    const vertex = { y: offsetY, dx: 0 };
+    part.symVertices.push(vertex);
+    const hl = document.createElementNS(svgNS, "rect");
+    hl.setAttribute("width", 8);
+    hl.setAttribute("height", 8);
+    hl.classList.add("vertex-handle");
+    part.g.appendChild(hl);
+    hl.addEventListener("mousedown", (evt) => startVertexDrag(evt, part, vertex, "left"));
+    const hr = document.createElementNS(svgNS, "rect");
+    hr.setAttribute("width", 8);
+    hr.setAttribute("height", 8);
+    hr.classList.add("vertex-handle");
+    part.g.appendChild(hr);
+    hr.addEventListener("mousedown", (evt) => startVertexDrag(evt, part, vertex, "right"));
+    vertex.handleLeft = hl;
+    vertex.handleRight = hr;
+    part.vertexHandles.push(hl, hr);
+    const fromLeft = e.offsetX - part.x < part.width / 2;
+    startVertexDrag(e, part, vertex, fromLeft ? "left" : "right");
+  }
   updatePolygonShape(part);
   updateVertexHandles(part);
-  const fromLeft = e.offsetX - part.x < part.width / 2;
-  startVertexDrag(e, part, vertex, fromLeft ? "left" : "right");
-  creatingSpecial = false;
-  canvas.removeEventListener("mousedown", startSpecialDraw);
 }
 
 
@@ -486,6 +495,14 @@ function removePart(part) {
     }
     baseY += parts[i].height;
   }
+}
+
+function showContextMenu(e, part) {
+  contextPart = part;
+  const menu = document.getElementById("contextMenu");
+  menu.style.left = `${e.pageX}px`;
+  menu.style.top = `${e.pageY}px`;
+  menu.style.display = "block";
 }
 
 // --- Import Logic ---
