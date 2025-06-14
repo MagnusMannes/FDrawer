@@ -201,6 +201,7 @@ function addPartEventListeners(part) {
     toggleSpecialVertex(e, part);
   });
   part.g.addEventListener("contextmenu", (e) => {
+
     showContextMenu(e, part);
   });
   part.handle.addEventListener("mousedown", (e) => startResize(e, part));
@@ -498,12 +499,7 @@ function removePart(part) {
 }
 
 function showContextMenu(e, part) {
-  e.preventDefault();
-  contextPart = part;
-  const menu = document.getElementById("contextMenu");
-  const rect = canvas.getBoundingClientRect();
-  menu.style.left = `${e.clientX - rect.left}px`;
-  menu.style.top = `${e.clientY - rect.top}px`;
+
   menu.style.display = "block";
 }
 
