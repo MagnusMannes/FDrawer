@@ -15,6 +15,7 @@ let copiedShape = null;
 let contextPart = null;
 const menu = document.getElementById("contextMenu");
 let zoom = 1;
+let unitScale = 1;
 const undoStack = [];
 
 let drawMode = null;
@@ -196,6 +197,16 @@ document.getElementById("pasteColor").addEventListener("click", () => {
     document.getElementById("colorPicker").value = copiedColor;
   }
 });
+
+const scaleSlider = document.getElementById("scaleSlider");
+const scaleValue = document.getElementById("scaleValue");
+if (scaleSlider) {
+  scaleSlider.addEventListener("input", () => {
+    unitScale = parseFloat(scaleSlider.value);
+    scaleValue.textContent = unitScale.toFixed(1) + "x";
+  });
+  scaleValue.textContent = unitScale.toFixed(1) + "x";
+}
 
 document.getElementById("removeBody").addEventListener("click", () => {
   if (contextPart) removePart(contextPart);
@@ -1075,7 +1086,8 @@ function parseDimension(input, defUnit) {
   }
   let val = unit === 'in' ? parseFractionalInches(s) : parseFloat(s);
   if (isNaN(val)) return NaN;
-  return unit === 'in' ? val * PX_PER_INCH : val * PX_PER_CM;
+  const base = unit === 'in' ? PX_PER_INCH : PX_PER_CM;
+  return val * base * unitScale;
 }
 
 function applyNewWidth(part, newW) {
