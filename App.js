@@ -29,8 +29,11 @@ document.getElementById("lastUpdated").textContent = new Date(document.lastModif
 
 function updateCanvasSize() {
   const bottom = parts.reduce((m, p) => Math.max(m, p.y + p.height), 0);
+  const right = parts.reduce((m, p) => Math.max(m, p.x + p.width), 0);
   const newH = Math.max(canvasArea.clientHeight, bottom + 20);
+  const newW = Math.max(canvasArea.clientWidth, right + 20);
   canvas.style.height = `${newH}px`;
+  canvas.style.width = `${newW}px`;
   centerDiagram();
 }
 
@@ -42,7 +45,10 @@ function centerDiagram() {
   const bottom = Math.max(...parts.map((p) => p.y + p.height));
   const cx = (left + right) / 2;
   const cy = (top + bottom) / 2;
-  canvasArea.scrollLeft = cx * zoom - canvasArea.clientWidth / 2;
+  const desiredLeft = cx * zoom - canvasArea.clientWidth / 2;
+  canvasArea.scrollLeft = Math.max(0, desiredLeft);
+  const margin = desiredLeft < 0 ? -desiredLeft : 0;
+  canvas.style.marginLeft = `${margin}px`;
   canvasArea.scrollTop = cy * zoom - canvasArea.clientHeight / 2;
 }
 
@@ -73,6 +79,14 @@ function setDrawMode(mode) {
 document.getElementById('drawLine').addEventListener('click', () => setDrawMode('line'));
 document.getElementById('drawCurve').addEventListener('click', () => setDrawMode('curve'));
 document.getElementById('drawCircle').addEventListener('click', () => setDrawMode('circle'));
+document.getElementById('zoomIn').addEventListener('click', () => {
+  zoom = Math.min(3, zoom + 0.1);
+  updateZoom();
+});
+document.getElementById('zoomOut').addEventListener('click', () => {
+  zoom = Math.max(0.01, zoom - 0.1);
+  updateZoom();
+});
 
 function handleCanvasClick(e) {
   if (!drawMode) return;
@@ -166,12 +180,7 @@ function handleMouseMove(e) {
   }
 }
 
-canvas.addEventListener("wheel", (e) => {
-  e.preventDefault();
-  if (e.deltaY < 0) zoom = Math.min(3, zoom + 0.1);
-  else zoom = Math.max(0.01, zoom - 0.1);
-  updateZoom();
-});
+window.addEventListener("resize", centerDiagram);
 
 function updateZoom() {
   canvas.style.transformOrigin = "0 0";
