@@ -450,6 +450,8 @@ function createPartFromData(p) {
     v.handleRight.addEventListener("mousedown", (evt) =>
       startVertexDrag(evt, partData, v, "right")
     );
+    v.handleLeft.addEventListener("dblclick", () => promptVertexWidth(partData, v));
+    v.handleRight.addEventListener("dblclick", () => promptVertexWidth(partData, v));
   });
 
   parts.push(partData);
@@ -551,12 +553,14 @@ function applyShapeToPart(part, data) {
       hl.classList.add('vertex-handle');
       part.g.appendChild(hl);
       hl.addEventListener('mousedown', (evt) => startVertexDrag(evt, part, vertex, 'left'));
+      hl.addEventListener('dblclick', () => promptVertexWidth(part, vertex));
       const hr = document.createElementNS(svgNS, 'rect');
       hr.setAttribute('width', 8);
       hr.setAttribute('height', 8);
       hr.classList.add('vertex-handle');
       part.g.appendChild(hr);
       hr.addEventListener('mousedown', (evt) => startVertexDrag(evt, part, vertex, 'right'));
+      hr.addEventListener('dblclick', () => promptVertexWidth(part, vertex));
       vertex.handleLeft = hl;
       vertex.handleRight = hr;
       part.symVertices.push(vertex);
@@ -588,7 +592,8 @@ function addPartEventListeners(part) {
     toggleSpecialVertex(e, part);
   });
   part.g.addEventListener("contextmenu", (e) => {
-
+    // stop propagation so canvas listener doesn't override our menu
+    e.stopPropagation();
     showContextMenu(e, part);
   });
   part.handle.addEventListener("mousedown", (e) => startResize(e, part));
@@ -685,12 +690,14 @@ function toggleSpecialVertex(e, part) {
     hl.classList.add("vertex-handle");
     part.g.appendChild(hl);
     hl.addEventListener("mousedown", (evt) => startVertexDrag(evt, part, vertex, "left"));
+    hl.addEventListener("dblclick", () => promptVertexWidth(part, vertex));
     const hr = document.createElementNS(svgNS, "rect");
     hr.setAttribute("width", 8);
     hr.setAttribute("height", 8);
     hr.classList.add("vertex-handle");
     part.g.appendChild(hr);
     hr.addEventListener("mousedown", (evt) => startVertexDrag(evt, part, vertex, "right"));
+    hr.addEventListener("dblclick", () => promptVertexWidth(part, vertex));
     vertex.handleLeft = hl;
     vertex.handleRight = hr;
     part.vertexHandles.push(hl, hr);
@@ -1015,6 +1022,23 @@ function stopVertexDrag() {
   window.removeEventListener("mousemove", doVertexDrag);
   window.removeEventListener("mouseup", stopVertexDrag);
   vertexDrag = null;
+}
+
+function promptVertexWidth(part, vertex) {
+  const currentW = part.width + 2 * vertex.dx;
+  const input = prompt(
+    "Enter width at this point (e.g., 8 1/2, 8.5in):",
+    (currentW / PX_PER_INCH).toFixed(2) + "in"
+  );
+  if (!input) return;
+  const w = parseDimension(input, "in");
+  if (isNaN(w)) {
+    alert("Invalid width value");
+    return;
+  }
+  vertex.dx = Math.max(0, (w - part.width) / 2);
+  updatePolygonShape(part);
+  updateVertexHandles(part);
 }
 
 function removePart(part) {
