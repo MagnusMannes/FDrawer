@@ -14,6 +14,7 @@ let copiedColor = null;
 let copiedShape = null;
 let contextPart = null;
 const menu = document.getElementById("contextMenu");
+const canvasArea = document.getElementById("canvas_area");
 let zoom = 1;
 const undoStack = [];
 
@@ -25,6 +26,25 @@ let circleCenter = null;
 const APP_VERSION = "1.0";
 document.getElementById("version").textContent = APP_VERSION;
 document.getElementById("lastUpdated").textContent = new Date(document.lastModified).toLocaleString();
+
+function updateCanvasSize() {
+  const bottom = parts.reduce((m, p) => Math.max(m, p.y + p.height), 0);
+  const newH = Math.max(canvasArea.clientHeight, bottom + 20);
+  canvas.style.height = `${newH}px`;
+  centerDiagram();
+}
+
+function centerDiagram() {
+  if (!parts.length) return;
+  const left = Math.min(...parts.map((p) => p.x));
+  const right = Math.max(...parts.map((p) => p.x + p.width));
+  const top = Math.min(...parts.map((p) => p.y));
+  const bottom = Math.max(...parts.map((p) => p.y + p.height));
+  const cx = (left + right) / 2;
+  const cy = (top + bottom) / 2;
+  canvasArea.scrollLeft = cx * zoom - canvasArea.clientWidth / 2;
+  canvasArea.scrollTop = cy * zoom - canvasArea.clientHeight / 2;
+}
 
 // --- Toolbar buttons ---
 document.getElementById("addBody").addEventListener("click", addBody);
@@ -149,13 +169,14 @@ function handleMouseMove(e) {
 canvas.addEventListener("wheel", (e) => {
   e.preventDefault();
   if (e.deltaY < 0) zoom = Math.min(3, zoom + 0.1);
-  else zoom = Math.max(0.5, zoom - 0.1);
+  else zoom = Math.max(0.01, zoom - 0.1);
   updateZoom();
 });
 
 function updateZoom() {
   canvas.style.transformOrigin = "0 0";
   canvas.style.transform = `scale(${zoom})`;
+  centerDiagram();
 }
 
 function saveState() {
@@ -429,6 +450,7 @@ function addBody() {
   addPartEventListeners(part);
   toggleHandles(part, false);
   selectPart(part);
+  updateCanvasSize();
 }
 
 function exportPart(part) {
@@ -614,6 +636,7 @@ function createPartFromData(p) {
   updateVertexHandles(partData);
   addPartEventListeners(partData);
   toggleHandles(partData, false);
+  updateCanvasSize();
   return partData;
 }
 
@@ -1117,6 +1140,7 @@ function updatePartHeight(part, newH) {
     }
     baseY += parts[i].height;
   }
+  updateCanvasSize();
 }
 
 // --- Polygon Shape Helpers ---
@@ -1234,6 +1258,7 @@ function removePart(part) {
     updateVertexHandles(p);
     baseY += p.height;
   }
+  updateCanvasSize();
 }
 
 function showContextMenu(e, part) {
@@ -1282,6 +1307,7 @@ function clearCanvas() {
   drawLayer.innerHTML = '';
   selectedPart = null;
   canvas.appendChild(drawLayer);
+  updateCanvasSize();
 }
 function loadFromData(data) {
   clearCanvas();
@@ -1296,7 +1322,9 @@ function loadFromData(data) {
     });
     drawnShapes.push(...data.drawnShapes);
   }
+  updateCanvasSize();
 }
 
 // capture initial empty state
 saveState();
+updateCanvasSize();
