@@ -1087,20 +1087,27 @@ function removePart(part) {
   if (selectedPart === part) selectedPart = null;
   let baseY = idx > 0 ? parts[idx - 1].y + parts[idx - 1].height : 20;
   for (let i = idx; i < parts.length; i++) {
-    parts[i].y = baseY;
-    parts[i].rect.setAttribute("y", baseY);
-    parts[i].handle.setAttribute("y", baseY + parts[i].height - 5);
-    parts[i].leftHandle.setAttribute("y", baseY + parts[i].height / 2 - 5);
-    parts[i].rightHandle.setAttribute("y", baseY + parts[i].height / 2 - 5);
-    parts[i].topLabel.setAttribute("y", baseY - 6);
-    parts[i].bottomLabel.setAttribute("y", baseY + parts[i].height + 6);
-    if (parts[i].specialIcon) {
-      parts[i].specialIcon.setAttribute(
-        "y",
-        baseY + parts[i].height / 2 - 7
-      );
+    const p = parts[i];
+    const dy = baseY - p.y;
+    p.y = baseY;
+    p.rect.setAttribute("y", baseY);
+    p.handle.setAttribute("y", baseY + p.height - 5);
+    p.leftHandle.setAttribute("y", baseY + p.height / 2 - 5);
+    p.rightHandle.setAttribute("y", baseY + p.height / 2 - 5);
+    p.topLabel.setAttribute("y", baseY - 6);
+    p.bottomLabel.setAttribute("y", baseY + p.height + 6);
+    if (p.specialIcon) {
+      p.specialIcon.setAttribute("y", baseY + p.height / 2 - 7);
     }
-    baseY += parts[i].height;
+    if (p.specialForms) {
+      p.specialForms.forEach((sf) => {
+        if (sf.rect) sf.rect.setAttribute("y", parseFloat(sf.rect.getAttribute("y")) + dy);
+        if (sf.rect2) sf.rect2.setAttribute("y", parseFloat(sf.rect2.getAttribute("y")) + dy);
+      });
+    }
+    updatePolygonShape(p);
+    updateVertexHandles(p);
+    baseY += p.height;
   }
 }
 
