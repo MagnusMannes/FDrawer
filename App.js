@@ -6,6 +6,8 @@ canvas.addEventListener("contextmenu", (e) => {
 });
 const drawLayer = document.createElementNS(svgNS, "g");
 canvas.appendChild(drawLayer);
+const axisLayer = document.createElementNS(svgNS, "g");
+canvas.appendChild(axisLayer);
 const parts = [];
 const drawnShapes = [];
 let tempShape = null;
@@ -30,11 +32,12 @@ document.getElementById("lastUpdated").textContent = new Date(document.lastModif
 function updateCanvasSize() {
   const bottom = parts.reduce((m, p) => Math.max(m, p.y + p.height), 0);
   const right = parts.reduce((m, p) => Math.max(m, p.x + p.width), 0);
-  const newH = Math.max(canvasArea.clientHeight, bottom + 20);
-  const newW = Math.max(canvasArea.clientWidth, right + 20);
+  const newH = Math.max(canvasArea.clientHeight, bottom + 40);
+  const newW = Math.max(canvasArea.clientWidth, right + 40);
   canvas.style.height = `${newH}px`;
   canvas.style.width = `${newW}px`;
   centerDiagram();
+  updateAxes();
 }
 
 function centerDiagram() {
@@ -1311,14 +1314,91 @@ function createDrawnShapeFromData(s) {
   }
 }
 
+function updateAxes() {
+  axisLayer.innerHTML = '';
+  if (!parts.length) return;
+
+  const left = Math.min(...parts.map((p) => p.x));
+  const right = Math.max(...parts.map((p) => p.x + p.width));
+  const top = Math.min(...parts.map((p) => p.y));
+  const bottom = Math.max(...parts.map((p) => p.y + p.height));
+
+  const width = right - left;
+  const height = bottom - top;
+  const centerX = (left + right) / 2;
+
+  const axisY = bottom + 10;
+  const hAxis = document.createElementNS(svgNS, 'line');
+  hAxis.setAttribute('x1', left);
+  hAxis.setAttribute('x2', right);
+  hAxis.setAttribute('y1', axisY);
+  hAxis.setAttribute('y2', axisY);
+  hAxis.classList.add('axis-line');
+  axisLayer.appendChild(hAxis);
+
+  const maxIn = width / PX_PER_INCH;
+  for (let i = 0; i <= Math.ceil(maxIn); i++) {
+    const d = (i / 2) * PX_PER_INCH;
+    [-1, 1].forEach((s) => {
+      const x = centerX + s * d;
+      const tick = document.createElementNS(svgNS, 'line');
+      tick.setAttribute('x1', x);
+      tick.setAttribute('x2', x);
+      tick.setAttribute('y1', axisY - 4);
+      tick.setAttribute('y2', axisY + 4);
+      tick.classList.add('axis-line');
+      axisLayer.appendChild(tick);
+
+      const txt = document.createElementNS(svgNS, 'text');
+      txt.setAttribute('x', x);
+      txt.setAttribute('y', axisY + 14);
+      txt.setAttribute('text-anchor', 'middle');
+      txt.classList.add('axis-label');
+      txt.textContent = i;
+      axisLayer.appendChild(txt);
+    });
+  }
+
+  const axisX = left - 20;
+  const vAxis = document.createElementNS(svgNS, 'line');
+  vAxis.setAttribute('x1', axisX);
+  vAxis.setAttribute('x2', axisX);
+  vAxis.setAttribute('y1', bottom);
+  vAxis.setAttribute('y2', top);
+  vAxis.classList.add('axis-line');
+  axisLayer.appendChild(vAxis);
+
+  const maxCm = height / PX_PER_CM;
+  for (let i = 0; i <= Math.ceil(maxCm); i++) {
+    const y = bottom - i * PX_PER_CM;
+    const tick = document.createElementNS(svgNS, 'line');
+    tick.setAttribute('x1', axisX - 4);
+    tick.setAttribute('x2', axisX + 4);
+    tick.setAttribute('y1', y);
+    tick.setAttribute('y2', y);
+    tick.classList.add('axis-line');
+    axisLayer.appendChild(tick);
+
+    const txt = document.createElementNS(svgNS, 'text');
+    txt.setAttribute('x', axisX - 6);
+    txt.setAttribute('y', y + 3);
+    txt.setAttribute('text-anchor', 'end');
+    txt.classList.add('axis-label');
+    txt.textContent = i;
+    axisLayer.appendChild(txt);
+  }
+}
+
 // --- Import Logic ---
 function clearCanvas() {
   while (canvas.firstChild) canvas.removeChild(canvas.firstChild);
   parts.length = 0;
   drawnShapes.length = 0;
   drawLayer.innerHTML = '';
+  axisLayer.innerHTML = '';
   selectedPart = null;
   canvas.appendChild(drawLayer);
+  canvas.appendChild(axisLayer);
   updateCanvasSize();
 }
 function loadFromData(data) {
