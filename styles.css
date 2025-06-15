@@ -6,6 +6,7 @@ button.tool{cursor:pointer;margin:4px 0;padding:6px 8px;font-size:14px;border:1p
 button.tool:hover{background:#e9e9e9;}
 button.tool.active{background:#cde0ff;}
 label.tool{margin:4px 0;display:block;font-size:14px;cursor:pointer;}
+input[type=range]{width:100%;}
 #canvas_area{flex:1;position:relative;overflow:auto;}
 svg{width:100%;height:100%;background:#fff;}
 .rect.selected{stroke:#0074d9;stroke-width:2;fill-opacity:.8;}

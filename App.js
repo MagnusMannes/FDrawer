@@ -15,6 +15,9 @@ let copiedShape = null;
 let contextPart = null;
 const menu = document.getElementById("contextMenu");
 let zoom = 1;
+let unitScale = 1;
+const PX_PER_INCH = 96;
+const PX_PER_CM = PX_PER_INCH / 2.54;
 const undoStack = [];
 
 let drawMode = null;
@@ -150,12 +153,18 @@ canvas.addEventListener("wheel", (e) => {
   e.preventDefault();
   if (e.deltaY < 0) zoom = Math.min(3, zoom + 0.1);
   else zoom = Math.max(0.5, zoom - 0.1);
-  updateZoom();
+  updateViewTransform();
 });
 
-function updateZoom() {
+function updateViewTransform() {
+  const baseScale = canvas.clientHeight / (1000 * PX_PER_CM);
+  const scale = zoom * unitScale * baseScale;
   canvas.style.transformOrigin = "0 0";
-  canvas.style.transform = `scale(${zoom})`;
+  canvas.style.transform = `scale(${scale})`;
+}
+
+function updateZoom() {
+  updateViewTransform();
 }
 
 function saveState() {
@@ -196,6 +205,18 @@ document.getElementById("pasteColor").addEventListener("click", () => {
     document.getElementById("colorPicker").value = copiedColor;
   }
 });
+
+const scaleSlider = document.getElementById("scaleSlider");
+const scaleValue = document.getElementById("scaleValue");
+if (scaleSlider) {
+  scaleSlider.addEventListener("input", () => {
+    unitScale = parseFloat(scaleSlider.value);
+    scaleValue.textContent = unitScale.toFixed(1) + "x";
+    updateViewTransform();
+  });
+  scaleValue.textContent = unitScale.toFixed(1) + "x";
+  updateViewTransform();
+}
 
 document.getElementById("removeBody").addEventListener("click", () => {
   if (contextPart) removePart(contextPart);
@@ -1047,8 +1068,6 @@ function updatePartWidth(part) {
 }
 
 // -- Dimension Helpers --
-const PX_PER_INCH = 96;
-const PX_PER_CM = PX_PER_INCH / 2.54;
 
 function parseFractionalInches(str) {
   str = str.trim();
@@ -1075,7 +1094,8 @@ function parseDimension(input, defUnit) {
   }
   let val = unit === 'in' ? parseFractionalInches(s) : parseFloat(s);
   if (isNaN(val)) return NaN;
-  return unit === 'in' ? val * PX_PER_INCH : val * PX_PER_CM;
+  const base = unit === 'in' ? PX_PER_INCH : PX_PER_CM;
+  return val * base;
 }
 
 function applyNewWidth(part, newW) {
