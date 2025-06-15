@@ -447,8 +447,14 @@ function createPartFromData(p) {
     v.handleLeft.addEventListener("mousedown", (evt) =>
       startVertexDrag(evt, partData, v, "left")
     );
+    v.handleLeft.addEventListener("dblclick", () =>
+      setVertexWidth(partData, v)
+    );
     v.handleRight.addEventListener("mousedown", (evt) =>
       startVertexDrag(evt, partData, v, "right")
+    );
+    v.handleRight.addEventListener("dblclick", () =>
+      setVertexWidth(partData, v)
     );
   });
 
@@ -551,12 +557,14 @@ function applyShapeToPart(part, data) {
       hl.classList.add('vertex-handle');
       part.g.appendChild(hl);
       hl.addEventListener('mousedown', (evt) => startVertexDrag(evt, part, vertex, 'left'));
+      hl.addEventListener('dblclick', () => setVertexWidth(part, vertex));
       const hr = document.createElementNS(svgNS, 'rect');
       hr.setAttribute('width', 8);
       hr.setAttribute('height', 8);
       hr.classList.add('vertex-handle');
       part.g.appendChild(hr);
       hr.addEventListener('mousedown', (evt) => startVertexDrag(evt, part, vertex, 'right'));
+      hr.addEventListener('dblclick', () => setVertexWidth(part, vertex));
       vertex.handleLeft = hl;
       vertex.handleRight = hr;
       part.symVertices.push(vertex);
@@ -685,12 +693,14 @@ function toggleSpecialVertex(e, part) {
     hl.classList.add("vertex-handle");
     part.g.appendChild(hl);
     hl.addEventListener("mousedown", (evt) => startVertexDrag(evt, part, vertex, "left"));
+    hl.addEventListener("dblclick", () => setVertexWidth(part, vertex));
     const hr = document.createElementNS(svgNS, "rect");
     hr.setAttribute("width", 8);
     hr.setAttribute("height", 8);
     hr.classList.add("vertex-handle");
     part.g.appendChild(hr);
     hr.addEventListener("mousedown", (evt) => startVertexDrag(evt, part, vertex, "right"));
+    hr.addEventListener("dblclick", () => setVertexWidth(part, vertex));
     vertex.handleLeft = hl;
     vertex.handleRight = hr;
     part.vertexHandles.push(hl, hr);
@@ -1017,6 +1027,19 @@ function stopVertexDrag() {
   vertexDrag = null;
 }
 
+function setVertexWidth(part, vertex) {
+  const input = prompt("Enter width (e.g., 10cm, 8in, 8 1/2in):", "");
+  if (!input) return;
+  const w = parseDimension(input, "cm");
+  if (isNaN(w)) {
+    alert("Invalid width value");
+    return;
+  }
+  vertex.dx = Math.max(0, (w - part.width) / 2);
+  updatePolygonShape(part);
+  updateVertexHandles(part);
+}
+
 function removePart(part) {
   const idx = parts.indexOf(part);
   if (idx === -1) return;
@@ -1044,6 +1067,7 @@ function removePart(part) {
 
 function showContextMenu(e, part) {
   e.preventDefault();
+  e.stopPropagation();
   contextPart = part;
   document.getElementById('copyColorMenu').style.display = part ? 'block' : 'none';
   document.getElementById('pasteColorMenu').style.display = part && copiedColor ? 'block' : 'none';
