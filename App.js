@@ -1016,7 +1016,8 @@ function doVertexDrag(e) {
   const currentX = e.clientX;
   const { part, vertex, side, startX, startDx } = vertexDrag;
   const delta = side === "left" ? startX - currentX : currentX - startX;
-  vertex.dx = Math.max(0, startDx + delta);
+  const minDx = -part.width / 2 + 1;
+  vertex.dx = Math.max(minDx, startDx + delta);
   updatePolygonShape(part);
   updateVertexHandles(part);
 }
@@ -1035,7 +1036,9 @@ function setVertexWidth(part, vertex) {
     alert("Invalid width value");
     return;
   }
-  vertex.dx = Math.max(0, (w - part.width) / 2);
+  const desiredDx = (w - part.width) / 2;
+  const minDx = -part.width / 2 + 1;
+  vertex.dx = Math.max(minDx, desiredDx);
   updatePolygonShape(part);
   updateVertexHandles(part);
 }
