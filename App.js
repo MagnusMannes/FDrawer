@@ -86,13 +86,22 @@ document.getElementById("copyShapeMenu").addEventListener("click", () => {
 });
 
 document.getElementById("pasteShapeMenu").addEventListener("click", () => {
-  if (copiedShape) {
-    const data = JSON.parse(JSON.stringify(copiedShape));
+  if (!copiedShape) {
+    menu.style.display = "none";
+    return;
+  }
+  const data = JSON.parse(JSON.stringify(copiedShape));
+  if (contextPart) {
+    data.x = contextPart.x;
+    data.y = contextPart.y;
+    applyShapeToPart(contextPart, data);
+  } else {
     data.x += 10;
     data.y += 10;
     createPartFromData(data);
   }
   menu.style.display = "none";
+  contextPart = null;
 });
 
 document.getElementById("setSizeMenu").addEventListener("click", () => {
@@ -451,6 +460,115 @@ function createPartFromData(p) {
   return partData;
 }
 
+function applyShapeToPart(part, data) {
+  const offX = data.x - part.x;
+  const offY = data.y - part.y;
+
+  // remove existing extras
+  if (part.specialIcon) {
+    part.specialIcon.remove();
+    part.specialIcon = null;
+  }
+  if (part.specialForms) {
+    part.specialForms.forEach((sf) => {
+      if (sf.rect) sf.rect.remove();
+      if (sf.rect2) sf.rect2.remove();
+    });
+    part.specialForms = [];
+  }
+  if (part.vertexHandles) {
+    part.vertexHandles.forEach((h) => h.remove());
+  }
+  part.symVertices = [];
+  part.vertexHandles = [];
+
+  applyNewWidth(part, data.width);
+  updatePartHeight(part, data.height);
+
+  part.color = data.color;
+  part.shape.setAttribute('fill', data.color);
+
+  part.topConnector = data.topConnector;
+  part.bottomConnector = data.bottomConnector;
+  part.topLabel.textContent = labelFor(part.topConnector);
+  updateConnectorLabelClass(part.topLabel, part.topConnector);
+  part.bottomLabel.textContent = labelFor(part.bottomConnector);
+  updateConnectorLabelClass(part.bottomLabel, part.bottomConnector);
+
+  part.special = data.special;
+  if (part.special) {
+    const icon = document.createElementNS(svgNS, 'rect');
+    icon.setAttribute('x', part.x + part.width + 4);
+    icon.setAttribute('y', part.y + part.height / 2 - 7);
+    icon.setAttribute('width', 14);
+    icon.setAttribute('height', 14);
+    icon.classList.add('special-placeholder');
+    part.g.appendChild(icon);
+    part.specialIcon = icon;
+  }
+
+  if (data.specialForms) {
+    data.specialForms.forEach((sf) => {
+      const r = document.createElementNS(svgNS, 'rect');
+      r.setAttribute('x', sf.x - offX);
+      r.setAttribute('y', sf.y - offY);
+      r.setAttribute('width', sf.width);
+      r.setAttribute('height', sf.height);
+      if (sf.rx) {
+        r.setAttribute('rx', sf.rx);
+        r.setAttribute('ry', sf.rx);
+      }
+      r.classList.add('special-form');
+      r.addEventListener('contextmenu', specialContext);
+      part.g.appendChild(r);
+      let r2 = null;
+      if (sf.symmetrical) {
+        r2 = document.createElementNS(svgNS, 'rect');
+        const center = part.x + part.width / 2;
+        const dx = sf.side === 'left' ? center - (sf.x - offX) - sf.width : (sf.x - offX) - center;
+        r2.setAttribute('x', center + dx);
+        r2.setAttribute('y', sf.y - offY);
+        r2.setAttribute('width', sf.width);
+        r2.setAttribute('height', sf.height);
+        if (sf.rx) {
+          r2.setAttribute('rx', sf.rx);
+          r2.setAttribute('ry', sf.rx);
+        }
+        r2.classList.add('special-form');
+        r2.addEventListener('contextmenu', specialContext);
+        part.g.appendChild(r2);
+      }
+      part.specialForms.push({ rect: r, rect2: r2, side: sf.side });
+    });
+  }
+
+  if (data.symVertices) {
+    data.symVertices.forEach((v) => {
+      const vertex = { y: v.y, dx: v.dx };
+      const hl = document.createElementNS(svgNS, 'rect');
+      hl.setAttribute('width', 8);
+      hl.setAttribute('height', 8);
+      hl.classList.add('vertex-handle');
+      part.g.appendChild(hl);
+      hl.addEventListener('mousedown', (evt) => startVertexDrag(evt, part, vertex, 'left'));
+      const hr = document.createElementNS(svgNS, 'rect');
+      hr.setAttribute('width', 8);
+      hr.setAttribute('height', 8);
+      hr.classList.add('vertex-handle');
+      part.g.appendChild(hr);
+      hr.addEventListener('mousedown', (evt) => startVertexDrag(evt, part, vertex, 'right'));
+      vertex.handleLeft = hl;
+      vertex.handleRight = hr;
+      part.symVertices.push(vertex);
+      part.vertexHandles.push(hl, hr);
+    });
+  }
+
+  updatePolygonShape(part);
+  updateVertexHandles(part);
+  toggleHandles(part, false);
+}
+
 function createConnectorLabel(x, y) {
   const t = document.createElementNS(svgNS, "text");
   t.setAttribute("x", x);
@@ -584,15 +702,59 @@ function toggleSpecialVertex(e, part) {
 }
 
 
+function findSpecialForm(el) {
+  for (const part of parts) {
+    for (const sf of part.specialForms || []) {
+      if (sf.rect === el || sf.rect2 === el) return { part, sf };
+    }
+  }
+  return null;
+}
+
 function specialContext(e) {
   e.preventDefault();
-  const action = prompt('Type "remove" to delete or enter roundness value');
+  const info = findSpecialForm(e.target);
+  if (!info) return;
+  const action = prompt('Type "remove" to delete, "size" to set dimensions, or enter roundness value');
   if (!action) return;
   if (action === "remove") {
-    if (e.target.parentNode) e.target.parentNode.removeChild(e.target);
-  } else {
-    e.target.setAttribute("rx", action);
-    e.target.setAttribute("ry", action);
+    if (info.sf.rect) info.sf.rect.remove();
+    if (info.sf.rect2) info.sf.rect2.remove();
+    info.part.specialForms = info.part.specialForms.filter((f) => f !== info.sf);
+    return;
+  }
+  if (action === "size") {
+    const wInput = prompt("Enter width in cm:", info.sf.rect.getAttribute('width'));
+    const hInput = prompt("Enter height in cm:", info.sf.rect.getAttribute('height'));
+    if (wInput) {
+      const w = parseDimension(wInput, 'cm');
+      if (!isNaN(w)) {
+        info.sf.rect.setAttribute('width', w);
+        if (info.sf.rect2) info.sf.rect2.setAttribute('width', w);
+      }
+    }
+    if (hInput) {
+      const h = parseDimension(hInput, 'cm');
+      if (!isNaN(h)) {
+        info.sf.rect.setAttribute('height', h);
+        if (info.sf.rect2) info.sf.rect2.setAttribute('height', h);
+      }
+    }
+    if (info.sf.rect2) {
+      const center = info.part.x + info.part.width / 2;
+      const x = parseFloat(info.sf.rect.getAttribute('x'));
+      const w = parseFloat(info.sf.rect.getAttribute('width'));
+      const dx = info.sf.side === 'left' ? center - x - w : x - center;
+      info.sf.rect2.setAttribute('x', center + dx);
+      info.sf.rect2.setAttribute('y', info.sf.rect.getAttribute('y'));
+    }
+    return;
+  }
+  info.sf.rect.setAttribute('rx', action);
+  info.sf.rect.setAttribute('ry', action);
+  if (info.sf.rect2) {
+    info.sf.rect2.setAttribute('rx', action);
+    info.sf.rect2.setAttribute('ry', action);
   }
 }
 function labelFor(s) {
@@ -883,6 +1045,12 @@ function removePart(part) {
 function showContextMenu(e, part) {
   e.preventDefault();
   contextPart = part;
+  document.getElementById('copyColorMenu').style.display = part ? 'block' : 'none';
+  document.getElementById('pasteColorMenu').style.display = part && copiedColor ? 'block' : 'none';
+  document.getElementById('copyShapeMenu').style.display = part ? 'block' : 'none';
+  document.getElementById('pasteShapeMenu').style.display = copiedShape ? 'block' : 'none';
+  document.getElementById('setSizeMenu').style.display = part ? 'block' : 'none';
+  document.getElementById('removeBody').style.display = part ? 'block' : 'none';
   menu.style.left = `${e.clientX}px`;
   menu.style.top = `${e.clientY}px`;
   menu.style.display = "block";
