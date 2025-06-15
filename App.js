@@ -4,6 +4,8 @@ canvas.addEventListener("contextmenu", (e) => {
   e.preventDefault();
   showContextMenu(e, null);
 });
+const drawLayer = document.createElementNS(svgNS, "g");
+canvas.appendChild(drawLayer);
 const parts = [];
 let selectedPart = null;
 let copiedColor = null;
@@ -12,6 +14,11 @@ let contextPart = null;
 const menu = document.getElementById("contextMenu");
 let zoom = 1;
 const undoStack = [];
+
+let drawMode = null;
+let lineStart = null;
+let curvePoints = [];
+let circleCenter = null;
 
 const APP_VERSION = "1.0";
 document.getElementById("version").textContent = APP_VERSION;
@@ -26,6 +33,68 @@ toggleConnectorBtn.addEventListener("click", () => {
   connectorMode = !connectorMode;
   toggleConnectorBtn.classList.toggle("active", connectorMode);
 });
+
+function setDrawMode(mode) {
+  drawMode = mode;
+  lineStart = null;
+  curvePoints = [];
+  circleCenter = null;
+  document.querySelectorAll('.draw-tool').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.mode === mode);
+  });
+}
+
+document.getElementById('drawLine').addEventListener('click', () => setDrawMode('line'));
+document.getElementById('drawCurve').addEventListener('click', () => setDrawMode('curve'));
+document.getElementById('drawCircle').addEventListener('click', () => setDrawMode('circle'));
+
+function handleCanvasClick(e) {
+  if (!drawMode) return;
+  e.stopPropagation();
+  const x = e.offsetX;
+  const y = e.offsetY;
+  if (drawMode === 'line') {
+    if (!lineStart) {
+      lineStart = { x, y };
+    } else {
+      const line = document.createElementNS(svgNS, 'line');
+      line.setAttribute('x1', lineStart.x);
+      line.setAttribute('y1', lineStart.y);
+      line.setAttribute('x2', x);
+      line.setAttribute('y2', y);
+      line.classList.add('drawn-shape');
+      drawLayer.appendChild(line);
+      setDrawMode(null);
+    }
+  } else if (drawMode === 'curve') {
+    curvePoints.push({ x, y });
+    if (curvePoints.length === 3) {
+      const path = document.createElementNS(svgNS, 'path');
+      const d = `M ${curvePoints[0].x} ${curvePoints[0].y} Q ${curvePoints[1].x} ${curvePoints[1].y} ${curvePoints[2].x} ${curvePoints[2].y}`;
+      path.setAttribute('d', d);
+      path.classList.add('drawn-shape');
+      drawLayer.appendChild(path);
+      setDrawMode(null);
+    }
+  } else if (drawMode === 'circle') {
+    if (!circleCenter) {
+      circleCenter = { x, y };
+    } else {
+      const dx = x - circleCenter.x;
+      const dy = y - circleCenter.y;
+      const r = Math.sqrt(dx * dx + dy * dy);
+      const circle = document.createElementNS(svgNS, 'circle');
+      circle.setAttribute('cx', circleCenter.x);
+      circle.setAttribute('cy', circleCenter.y);
+      circle.setAttribute('r', r);
+      circle.classList.add('drawn-shape');
+      drawLayer.appendChild(circle);
+      setDrawMode(null);
+    }
+  }
+}
+
+canvas.addEventListener('click', handleCanvasClick, true);
 
 canvas.addEventListener("wheel", (e) => {
   e.preventDefault();
@@ -279,6 +348,7 @@ function addBody() {
   g.appendChild(bottomLabel);
 
   canvas.appendChild(g);
+  canvas.appendChild(drawLayer);
 
   const part = {
     x,
@@ -450,6 +520,7 @@ function createPartFromData(p) {
   }
 
   canvas.appendChild(g);
+  canvas.appendChild(drawLayer);
 
   const partData = {
     ...p,
@@ -1131,6 +1202,7 @@ function clearCanvas() {
   while (canvas.firstChild) canvas.removeChild(canvas.firstChild);
   parts.length = 0;
   selectedPart = null;
+  canvas.appendChild(drawLayer);
 }
 function loadFromData(data) {
   clearCanvas();
