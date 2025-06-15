@@ -479,10 +479,40 @@ function addPartEventListeners(part) {
     (e) => startResize(e, part),
     { passive: false }
   );
+  part.handle.addEventListener("dblclick", () => {
+    const input = prompt("Enter height in cm:");
+    if (!input) return;
+    const h = parseDimension(input, "cm");
+    if (isNaN(h)) {
+      alert("Invalid height value");
+    } else {
+      updatePartHeight(part, h);
+    }
+  });
   part.leftHandle.addEventListener("mousedown", (e) => startHResize(e, part, "left"));
   part.leftHandle.addEventListener("touchstart", (e) => startHResize(e, part, "left"), { passive: false });
+  part.leftHandle.addEventListener("dblclick", () => {
+    const input = prompt("Enter width (e.g., 8 1/2, 8.5in):");
+    if (!input) return;
+    const w = parseDimension(input, "in");
+    if (isNaN(w)) {
+      alert("Invalid width value");
+    } else {
+      applyNewWidth(part, w);
+    }
+  });
   part.rightHandle.addEventListener("mousedown", (e) => startHResize(e, part, "right"));
   part.rightHandle.addEventListener("touchstart", (e) => startHResize(e, part, "right"), { passive: false });
+  part.rightHandle.addEventListener("dblclick", () => {
+    const input = prompt("Enter width (e.g., 8 1/2, 8.5in):");
+    if (!input) return;
+    const w = parseDimension(input, "in");
+    if (isNaN(w)) {
+      alert("Invalid width value");
+    } else {
+      applyNewWidth(part, w);
+    }
+  });
 }
 
 // --- Selection & Connector Logic ---
