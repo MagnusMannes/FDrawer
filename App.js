@@ -73,6 +73,14 @@ function setDrawMode(mode) {
 document.getElementById('drawLine').addEventListener('click', () => setDrawMode('line'));
 document.getElementById('drawCurve').addEventListener('click', () => setDrawMode('curve'));
 document.getElementById('drawCircle').addEventListener('click', () => setDrawMode('circle'));
+document.getElementById('zoomIn').addEventListener('click', () => {
+  zoom = Math.min(3, zoom + 0.1);
+  updateZoom();
+});
+document.getElementById('zoomOut').addEventListener('click', () => {
+  zoom = Math.max(0.01, zoom - 0.1);
+  updateZoom();
+});
 
 function handleCanvasClick(e) {
   if (!drawMode) return;
@@ -166,12 +174,15 @@ function handleMouseMove(e) {
   }
 }
 
-canvas.addEventListener("wheel", (e) => {
+function handleWheel(e) {
   e.preventDefault();
   if (e.deltaY < 0) zoom = Math.min(3, zoom + 0.1);
   else zoom = Math.max(0.01, zoom - 0.1);
   updateZoom();
-});
+}
+
+document.addEventListener("wheel", handleWheel, { passive: false });
+window.addEventListener("resize", centerDiagram);
 
 function updateZoom() {
   canvas.style.transformOrigin = "0 0";
