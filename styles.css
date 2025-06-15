@@ -24,3 +24,4 @@ svg{width:100%;height:100%;background:#fff;}
 .context-menu-item:hover{background:#eee;}
 .drawn-shape{stroke:#000;stroke-width:2;fill:none;pointer-events:none;}
 .preview-shape{stroke-dasharray:4 2;}
+.axis-layer line,.axis-layer text{pointer-events:none;stroke:#666;fill:#666;font-size:10px;}
