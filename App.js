@@ -4,9 +4,6 @@ canvas.addEventListener("contextmenu", (e) => {
   e.preventDefault();
   showContextMenu(e, null);
 });
-const axisLayer = document.createElementNS(svgNS, "g");
-axisLayer.classList.add("axis-layer");
-canvas.appendChild(axisLayer);
 const drawLayer = document.createElementNS(svgNS, "g");
 canvas.appendChild(drawLayer);
 const parts = [];
@@ -28,8 +25,6 @@ let circleCenter = null;
 const APP_VERSION = "1.0";
 document.getElementById("version").textContent = APP_VERSION;
 document.getElementById("lastUpdated").textContent = new Date(document.lastModified).toLocaleString();
-updateAxes();
-window.addEventListener('resize', updateAxes);
 
 // --- Toolbar buttons ---
 document.getElementById("addBody").addEventListener("click", addBody);
@@ -58,10 +53,6 @@ function setDrawMode(mode) {
 document.getElementById('drawLine').addEventListener('click', () => setDrawMode('line'));
 document.getElementById('drawCurve').addEventListener('click', () => setDrawMode('curve'));
 document.getElementById('drawCircle').addEventListener('click', () => setDrawMode('circle'));
-document.getElementById('scaleSlider').addEventListener('input', (e) => {
-  zoom = parseFloat(e.target.value);
-  updateZoom();
-});
 
 function handleCanvasClick(e) {
   if (!drawMode) return;
@@ -165,8 +156,6 @@ canvas.addEventListener("wheel", (e) => {
 function updateZoom() {
   canvas.style.transformOrigin = "0 0";
   canvas.style.transform = `scale(${zoom})`;
-  const slider = document.getElementById("scaleSlider");
-  if (slider) slider.value = zoom.toFixed(1);
 }
 
 function saveState() {
@@ -413,7 +402,6 @@ function addBody() {
   g.appendChild(bottomLabel);
 
   canvas.appendChild(g);
-  canvas.appendChild(axisLayer);
   canvas.appendChild(drawLayer);
 
   const part = {
@@ -586,7 +574,6 @@ function createPartFromData(p) {
   }
 
   canvas.appendChild(g);
-  canvas.appendChild(axisLayer);
   canvas.appendChild(drawLayer);
 
   const partData = {
@@ -1063,52 +1050,6 @@ function updatePartWidth(part) {
 const PX_PER_INCH = 96;
 const PX_PER_CM = PX_PER_INCH / 2.54;
 
-function updateAxes() {
-  while (axisLayer.firstChild) axisLayer.removeChild(axisLayer.firstChild);
-  const width = canvas.clientWidth;
-  const height = canvas.clientHeight;
-
-  const bottom = document.createElementNS(svgNS, 'line');
-  bottom.setAttribute('x1', 0);
-  bottom.setAttribute('y1', height);
-  bottom.setAttribute('x2', width);
-  bottom.setAttribute('y2', height);
-  axisLayer.appendChild(bottom);
-  for (let x = 0, i = 0; x <= width; x += PX_PER_INCH, i++) {
-    const tick = document.createElementNS(svgNS, 'line');
-    tick.setAttribute('x1', x);
-    tick.setAttribute('y1', height);
-    tick.setAttribute('x2', x);
-    tick.setAttribute('y2', height - 5);
-    axisLayer.appendChild(tick);
-    const lbl = document.createElementNS(svgNS, 'text');
-    lbl.setAttribute('x', x + 2);
-    lbl.setAttribute('y', height - 7);
-    lbl.textContent = i;
-    axisLayer.appendChild(lbl);
-  }
-
-  const left = document.createElementNS(svgNS, 'line');
-  left.setAttribute('x1', 0);
-  left.setAttribute('y1', 0);
-  left.setAttribute('x2', 0);
-  left.setAttribute('y2', height);
-  axisLayer.appendChild(left);
-  for (let y = 0, i = 0; y <= height; y += PX_PER_CM, i++) {
-    const tick = document.createElementNS(svgNS, 'line');
-    tick.setAttribute('x1', 0);
-    tick.setAttribute('y1', y);
-    tick.setAttribute('x2', 5);
-    tick.setAttribute('y2', y);
-    axisLayer.appendChild(tick);
-    const lbl = document.createElementNS(svgNS, 'text');
-    lbl.setAttribute('x', 7);
-    lbl.setAttribute('y', y + 3);
-    lbl.textContent = i;
-    axisLayer.appendChild(lbl);
-  }
-}
-
 function parseFractionalInches(str) {
   str = str.trim();
   let m = str.match(/^(\d+)\s+(\d+)\/(\d+)$/);
@@ -1340,9 +1281,7 @@ function clearCanvas() {
   drawnShapes.length = 0;
   drawLayer.innerHTML = '';
   selectedPart = null;
-  canvas.appendChild(axisLayer);
   canvas.appendChild(drawLayer);
-  updateAxes();
 }
 function loadFromData(data) {
   clearCanvas();
