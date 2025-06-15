@@ -4,7 +4,11 @@ canvas.addEventListener("contextmenu", (e) => {
   e.preventDefault();
   showContextMenu(e, null);
 });
+const drawLayer = document.createElementNS(svgNS, "g");
+canvas.appendChild(drawLayer);
 const parts = [];
+const drawnShapes = [];
+let tempShape = null;
 let selectedPart = null;
 let copiedColor = null;
 let copiedShape = null;
@@ -12,6 +16,11 @@ let contextPart = null;
 const menu = document.getElementById("contextMenu");
 let zoom = 1;
 const undoStack = [];
+
+let drawMode = null;
+let lineStart = null;
+let curvePoints = [];
+let circleCenter = null;
 
 const APP_VERSION = "1.0";
 document.getElementById("version").textContent = APP_VERSION;
@@ -27,6 +36,116 @@ toggleConnectorBtn.addEventListener("click", () => {
   toggleConnectorBtn.classList.toggle("active", connectorMode);
 });
 
+function setDrawMode(mode) {
+  drawMode = mode;
+  lineStart = null;
+  curvePoints = [];
+  circleCenter = null;
+  if (tempShape) {
+    tempShape.remove();
+    tempShape = null;
+  }
+  document.querySelectorAll('.draw-tool').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.mode === mode);
+  });
+}
+
+document.getElementById('drawLine').addEventListener('click', () => setDrawMode('line'));
+document.getElementById('drawCurve').addEventListener('click', () => setDrawMode('curve'));
+document.getElementById('drawCircle').addEventListener('click', () => setDrawMode('circle'));
+
+function handleCanvasClick(e) {
+  if (!drawMode) return;
+  e.stopPropagation();
+  const x = e.offsetX;
+  const y = e.offsetY;
+  if (drawMode === 'line') {
+    if (!lineStart) {
+      lineStart = { x, y };
+      tempShape = document.createElementNS(svgNS, 'line');
+      tempShape.setAttribute('x1', x);
+      tempShape.setAttribute('y1', y);
+      tempShape.setAttribute('x2', x);
+      tempShape.setAttribute('y2', y);
+      tempShape.classList.add('drawn-shape', 'preview-shape');
+      drawLayer.appendChild(tempShape);
+    } else {
+      tempShape.setAttribute('x2', x);
+      tempShape.setAttribute('y2', y);
+      tempShape.classList.remove('preview-shape');
+      drawnShapes.push({ type: 'line', x1: lineStart.x, y1: lineStart.y, x2: x, y2: y });
+      saveState();
+      tempShape = null;
+      setDrawMode(null);
+    }
+  } else if (drawMode === 'curve') {
+    curvePoints.push({ x, y });
+    if (curvePoints.length === 1) {
+      tempShape = document.createElementNS(svgNS, 'path');
+      tempShape.classList.add('drawn-shape', 'preview-shape');
+      drawLayer.appendChild(tempShape);
+    } else if (curvePoints.length === 3) {
+      const d = `M ${curvePoints[0].x} ${curvePoints[0].y} Q ${curvePoints[1].x} ${curvePoints[1].y} ${curvePoints[2].x} ${curvePoints[2].y}`;
+      tempShape.setAttribute('d', d);
+      tempShape.classList.remove('preview-shape');
+      drawnShapes.push({
+        type: 'curve',
+        p0: curvePoints[0],
+        p1: curvePoints[1],
+        p2: curvePoints[2],
+      });
+      saveState();
+      tempShape = null;
+      setDrawMode(null);
+    }
+  } else if (drawMode === 'circle') {
+    if (!circleCenter) {
+      circleCenter = { x, y };
+      tempShape = document.createElementNS(svgNS, 'circle');
+      tempShape.setAttribute('cx', x);
+      tempShape.setAttribute('cy', y);
+      tempShape.setAttribute('r', 0);
+      tempShape.classList.add('drawn-shape', 'preview-shape');
+      drawLayer.appendChild(tempShape);
+    } else {
+      const dx = x - circleCenter.x;
+      const dy = y - circleCenter.y;
+      const r = Math.sqrt(dx * dx + dy * dy);
+      tempShape.setAttribute('r', r);
+      tempShape.classList.remove('preview-shape');
+      drawnShapes.push({ type: 'circle', cx: circleCenter.x, cy: circleCenter.y, r });
+      saveState();
+      tempShape = null;
+      setDrawMode(null);
+    }
+  }
+}
+
+canvas.addEventListener('click', handleCanvasClick, true);
+canvas.addEventListener('mousemove', handleMouseMove, true);
+
+function handleMouseMove(e) {
+  if (!drawMode || !tempShape) return;
+  const x = e.offsetX;
+  const y = e.offsetY;
+  if (drawMode === 'line') {
+    tempShape.setAttribute('x2', x);
+    tempShape.setAttribute('y2', y);
+  } else if (drawMode === 'circle') {
+    const dx = x - circleCenter.x;
+    const dy = y - circleCenter.y;
+    tempShape.setAttribute('r', Math.sqrt(dx * dx + dy * dy));
+  } else if (drawMode === 'curve') {
+    if (curvePoints.length === 1) {
+      const d = `M ${curvePoints[0].x} ${curvePoints[0].y} L ${x} ${y}`;
+      tempShape.setAttribute('d', d);
+    } else if (curvePoints.length === 2) {
+      const d = `M ${curvePoints[0].x} ${curvePoints[0].y} Q ${curvePoints[1].x} ${curvePoints[1].y} ${x} ${y}`;
+      tempShape.setAttribute('d', d);
+    }
+  }
+}
+
 canvas.addEventListener("wheel", (e) => {
   e.preventDefault();
   if (e.deltaY < 0) zoom = Math.min(3, zoom + 0.1);
@@ -40,7 +159,10 @@ function updateZoom() {
 }
 
 function saveState() {
-  const state = JSON.stringify({ parts: parts.map((p) => exportPart(p)) });
+  const state = JSON.stringify({
+    parts: parts.map((p) => exportPart(p)),
+    drawnShapes,
+  });
   undoStack.push(state);
   if (undoStack.length > 15) undoStack.shift();
 }
@@ -190,6 +312,7 @@ document.getElementById("exportBtn").addEventListener("click", () => {
       })),
       symVertices: (p.symVertices || []).map((v) => ({ y: v.y, dx: v.dx })),
     })),
+    drawnShapes,
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], {
     type: "application/json",
@@ -279,6 +402,7 @@ function addBody() {
   g.appendChild(bottomLabel);
 
   canvas.appendChild(g);
+  canvas.appendChild(drawLayer);
 
   const part = {
     x,
@@ -450,6 +574,7 @@ function createPartFromData(p) {
   }
 
   canvas.appendChild(g);
+  canvas.appendChild(drawLayer);
 
   const partData = {
     ...p,
@@ -1126,18 +1251,51 @@ function showContextMenu(e, part) {
   menu.style.display = "block";
 }
 
+function createDrawnShapeFromData(s) {
+  let elem;
+  if (s.type === 'line') {
+    elem = document.createElementNS(svgNS, 'line');
+    elem.setAttribute('x1', s.x1);
+    elem.setAttribute('y1', s.y1);
+    elem.setAttribute('x2', s.x2);
+    elem.setAttribute('y2', s.y2);
+  } else if (s.type === 'curve') {
+    elem = document.createElementNS(svgNS, 'path');
+    elem.setAttribute('d', `M ${s.p0.x} ${s.p0.y} Q ${s.p1.x} ${s.p1.y} ${s.p2.x} ${s.p2.y}`);
+  } else if (s.type === 'circle') {
+    elem = document.createElementNS(svgNS, 'circle');
+    elem.setAttribute('cx', s.cx);
+    elem.setAttribute('cy', s.cy);
+    elem.setAttribute('r', s.r);
+  }
+  if (elem) {
+    elem.classList.add('drawn-shape');
+    drawLayer.appendChild(elem);
+  }
+}
+
 // --- Import Logic ---
 function clearCanvas() {
   while (canvas.firstChild) canvas.removeChild(canvas.firstChild);
   parts.length = 0;
+  drawnShapes.length = 0;
+  drawLayer.innerHTML = '';
   selectedPart = null;
+  canvas.appendChild(drawLayer);
 }
 function loadFromData(data) {
   clearCanvas();
-  if (!data.parts) return;
-  data.parts.forEach((p) => {
-    createPartFromData(p);
-  });
+  if (data.parts) {
+    data.parts.forEach((p) => {
+      createPartFromData(p);
+    });
+  }
+  if (data.drawnShapes) {
+    data.drawnShapes.forEach((s) => {
+      createDrawnShapeFromData(s);
+    });
+    drawnShapes.push(...data.drawnShapes);
+  }
 }
 
 // capture initial empty state
