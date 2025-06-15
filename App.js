@@ -11,7 +11,6 @@ let copiedShape = null;
 let contextPart = null;
 const menu = document.getElementById("contextMenu");
 let zoom = 1;
-const undoStack = [];
 
 const APP_VERSION = "1.0";
 document.getElementById("version").textContent = APP_VERSION;
@@ -39,21 +38,8 @@ function updateZoom() {
   canvas.style.transform = `scale(${zoom})`;
 }
 
-function saveState() {
-  const state = JSON.stringify({ parts: parts.map((p) => exportPart(p)) });
-  undoStack.push(state);
-  if (undoStack.length > 15) undoStack.shift();
-}
-
-function undo() {
-  if (!undoStack.length) return;
-  const state = undoStack.pop();
-  loadFromData(JSON.parse(state));
-}
-
 document.getElementById("colorPicker").addEventListener("input", (e) => {
   if (selectedPart) {
-    saveState();
     selectedPart.color = e.target.value;
     selectedPart.shape.setAttribute("fill", e.target.value);
   }
@@ -68,7 +54,6 @@ document.getElementById("copyColor").addEventListener("click", () => {
 
 document.getElementById("pasteColor").addEventListener("click", () => {
   if (selectedPart && copiedColor) {
-    saveState();
     selectedPart.color = copiedColor;
     selectedPart.shape.setAttribute("fill", copiedColor);
     document.getElementById("colorPicker").value = copiedColor;
@@ -81,12 +66,6 @@ document.getElementById("removeBody").addEventListener("click", () => {
   menu.style.display = "none";
 });
 
-document.getElementById("undoAction").addEventListener("click", () => {
-  undo();
-  menu.style.display = "none";
-  contextPart = null;
-});
-
 document.getElementById("copyColorMenu").addEventListener("click", () => {
   if (contextPart) copiedColor = contextPart.color;
   menu.style.display = "none";
@@ -94,7 +73,6 @@ document.getElementById("copyColorMenu").addEventListener("click", () => {
 
 document.getElementById("pasteColorMenu").addEventListener("click", () => {
   if (contextPart && copiedColor) {
-    saveState();
     contextPart.color = copiedColor;
     contextPart.shape.setAttribute("fill", copiedColor);
     document.getElementById("colorPicker").value = copiedColor;
@@ -112,7 +90,6 @@ document.getElementById("pasteShapeMenu").addEventListener("click", () => {
     menu.style.display = "none";
     return;
   }
-  saveState();
   const data = JSON.parse(JSON.stringify(copiedShape));
   if (contextPart) {
     data.x = contextPart.x;
@@ -129,7 +106,6 @@ document.getElementById("pasteShapeMenu").addEventListener("click", () => {
 
 document.getElementById("setSizeMenu").addEventListener("click", () => {
   if (contextPart) {
-    saveState();
     const wInput = prompt(
       "Enter width (e.g., 10cm, 8in, 8 1/2in):",
       ""
@@ -210,7 +186,6 @@ document.getElementById("fileInput").addEventListener("change", (e) => {
   const rd = new FileReader();
   rd.onload = () => {
     try {
-      saveState();
       loadFromData(JSON.parse(rd.result));
     } catch (err) {
       alert("Invalid JSON");
@@ -221,7 +196,6 @@ document.getElementById("fileInput").addEventListener("change", (e) => {
 
 // --- Part creation ---
 function addBody() {
-  saveState();
   const width = 60,
     height = 120;
   const x = canvas.clientWidth / 2 - width / 2;
@@ -682,7 +656,6 @@ function selectPart(part) {
 }
 
 function handleConnectorToggle(evt, part) {
-  saveState();
   const y = evt.offsetY;
   const rectY = part.y;
   const h = part.height;
@@ -702,7 +675,6 @@ function nextState(s) {
 
 // --- Special Feature Toggling ---
 function toggleSpecialVertex(e, part) {
-  saveState();
   const offsetY = e.offsetY - part.y;
   const existingIndex = part.symVertices.findIndex((v) => Math.abs(v.y - offsetY) < 5);
   if (existingIndex !== -1) {
@@ -751,7 +723,6 @@ function findSpecialForm(el) {
 
 function specialContext(e) {
   e.preventDefault();
-  saveState();
   const info = findSpecialForm(e.target);
   if (!info) return;
   const action = prompt('Type "remove" to delete, "size" to set dimensions, or enter roundness value');
@@ -811,7 +782,6 @@ let resizing = false,
   resizePart = null;
 function startResize(e, part) {
   e.preventDefault();
-  saveState();
   resizing = true;
   startY = e.touches ? e.touches[0].clientY : e.clientY;
   startHeight = part.height;
@@ -875,7 +845,6 @@ let hResizing = false,
   centerX = 0;
 function startHResize(e, part, dir) {
   e.preventDefault();
-  saveState();
   hResizing = true;
   startX = e.touches ? e.touches[0].clientX : e.clientX;
   startWidth = part.width;
@@ -954,7 +923,6 @@ function parseDimension(input, defUnit) {
 }
 
 function applyNewWidth(part, newW) {
-  saveState();
   const center = part.x + part.width / 2;
   part.width = newW;
   part.x = center - newW / 2;
@@ -962,7 +930,6 @@ function applyNewWidth(part, newW) {
 }
 
 function updatePartHeight(part, newH) {
-  saveState();
   const scale = newH / part.height;
   part.height = newH;
   part.rect.setAttribute('height', newH);
@@ -1039,7 +1006,6 @@ function toggleHandles(part, show) {
 let vertexDrag = null;
 function startVertexDrag(e, part, vertex, side) {
   e.preventDefault();
-  saveState();
   vertexDrag = { part, vertex, side, startX: e.clientX, startDx: vertex.dx };
   window.addEventListener("mousemove", doVertexDrag);
   window.addEventListener("mouseup", stopVertexDrag);
@@ -1070,7 +1036,6 @@ function setVertexWidth(part, vertex) {
     alert("Invalid width value");
     return;
   }
-  saveState();
   const desiredDx = (w - part.width) / 2;
   const minDx = -part.width / 2 + 1;
   vertex.dx = Math.max(minDx, desiredDx);
@@ -1079,7 +1044,6 @@ function setVertexWidth(part, vertex) {
 }
 
 function removePart(part) {
-  saveState();
   const idx = parts.indexOf(part);
   if (idx === -1) return;
   canvas.removeChild(part.g);
@@ -1132,6 +1096,3 @@ function loadFromData(data) {
     createPartFromData(p);
   });
 }
-
-// capture initial empty state
-saveState();
