@@ -95,6 +95,34 @@ document.getElementById("pasteShapeMenu").addEventListener("click", () => {
   menu.style.display = "none";
 });
 
+document.getElementById("setSizeMenu").addEventListener("click", () => {
+  if (contextPart) {
+    const wInput = prompt(
+      "Enter width (e.g., 10cm, 8in, 8 1/2in):",
+      ""
+    );
+    if (wInput) {
+      const w = parseDimension(wInput, "cm");
+      if (!isNaN(w)) {
+        applyNewWidth(contextPart, w);
+      } else {
+        alert("Invalid width value");
+      }
+    }
+    const hInput = prompt("Enter height in cm:", "");
+    if (hInput) {
+      const h = parseDimension(hInput, "cm");
+      if (!isNaN(h)) {
+        updatePartHeight(contextPart, h);
+      } else {
+        alert("Invalid height value");
+      }
+    }
+  }
+  menu.style.display = "none";
+  contextPart = null;
+});
+
 document.getElementById("resetView").addEventListener("click", () => {
   zoom = 1;
   updateZoom();
@@ -658,6 +686,77 @@ function updatePartWidth(part) {
   }
   updatePolygonShape(part);
   updateVertexHandles(part);
+}
+
+// -- Dimension Helpers --
+const PX_PER_INCH = 96;
+const PX_PER_CM = PX_PER_INCH / 2.54;
+
+function parseFractionalInches(str) {
+  str = str.trim();
+  let m = str.match(/^(\d+)\s+(\d+)\/(\d+)$/);
+  if (m) return parseInt(m[1]) + parseInt(m[2]) / parseInt(m[3]);
+  m = str.match(/^(\d+)\/(\d+)$/);
+  if (m) return parseInt(m[1]) / parseInt(m[2]);
+  return parseFloat(str);
+}
+
+function parseDimension(input, defUnit) {
+  if (!input) return NaN;
+  let s = input.trim().toLowerCase();
+  let unit = defUnit;
+  if (s.endsWith('cm')) {
+    unit = 'cm';
+    s = s.slice(0, -2).trim();
+  } else if (s.endsWith('inch')) {
+    unit = 'in';
+    s = s.slice(0, -4).trim();
+  } else if (s.endsWith('in')) {
+    unit = 'in';
+    s = s.slice(0, -2).trim();
+  }
+  let val = unit === 'in' ? parseFractionalInches(s) : parseFloat(s);
+  if (isNaN(val)) return NaN;
+  return unit === 'in' ? val * PX_PER_INCH : val * PX_PER_CM;
+}
+
+function applyNewWidth(part, newW) {
+  const center = part.x + part.width / 2;
+  part.width = newW;
+  part.x = center - newW / 2;
+  updatePartWidth(part);
+}
+
+function updatePartHeight(part, newH) {
+  const scale = newH / part.height;
+  part.height = newH;
+  part.rect.setAttribute('height', newH);
+  part.handle.setAttribute('y', part.y + newH - 5);
+  part.leftHandle.setAttribute('y', part.y + newH / 2 - 5);
+  part.rightHandle.setAttribute('y', part.y + newH / 2 - 5);
+  part.bottomLabel.setAttribute('y', part.y + newH + 6);
+  if (part.symVertices) {
+    part.symVertices.forEach(v => {
+      v.y *= scale;
+    });
+  }
+  updatePolygonShape(part);
+  updateVertexHandles(part);
+  const idx = parts.indexOf(part);
+  let baseY = part.y + newH;
+  for (let i = idx + 1; i < parts.length; i++) {
+    parts[i].y = baseY;
+    parts[i].rect.setAttribute('y', baseY);
+    parts[i].handle.setAttribute('y', baseY + parts[i].height - 5);
+    parts[i].leftHandle.setAttribute('y', baseY + parts[i].height / 2 - 5);
+    parts[i].rightHandle.setAttribute('y', baseY + parts[i].height / 2 - 5);
+    parts[i].topLabel.setAttribute('y', baseY - 6);
+    parts[i].bottomLabel.setAttribute('y', baseY + parts[i].height + 6);
+    if (parts[i].specialIcon) {
+      parts[i].specialIcon.setAttribute('y', baseY + parts[i].height / 2 - 7);
+    }
+    baseY += parts[i].height;
+  }
 }
 
 // --- Polygon Shape Helpers ---
