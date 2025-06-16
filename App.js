@@ -1086,7 +1086,7 @@ function startResize(e, part) {
 function doResize(e) {
   if (!resizing) return;
   const currentY = e.touches ? e.touches[0].clientY : e.clientY;
-  const delta = (currentY - startY) / zoom;
+  const delta = currentY - startY;
   const newH = Math.max(30, startHeight + delta);
   resizePart.height = newH;
   resizePart.rect.setAttribute("height", newH);
@@ -1153,7 +1153,7 @@ function startHResize(e, part, dir) {
 function doHResize(e) {
   if (!hResizing) return;
   const currentX = e.touches ? e.touches[0].clientX : e.clientX;
-  const delta = (hDir === "left" ? startX - currentX : currentX - startX) / zoom;
+  const delta = hDir === "left" ? startX - currentX : currentX - startX;
   const newW = Math.max(30, startWidth + delta * 2);
   hResizePart.width = newW;
   hResizePart.x = centerX - newW / 2;
@@ -1315,7 +1315,7 @@ function doVertexDrag(e) {
   if (!vertexDrag) return;
   const currentX = e.clientX;
   const { part, vertex, side, startX, startDx } = vertexDrag;
-  const delta = (side === "left" ? startX - currentX : currentX - startX) / zoom;
+  const delta = side === "left" ? startX - currentX : currentX - startX;
   const minDx = -part.width / 2 + 1;
   vertex.dx = Math.max(minDx, startDx + delta);
   updatePolygonShape(part);
