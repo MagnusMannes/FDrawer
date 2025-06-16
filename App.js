@@ -460,7 +460,9 @@ function addBody() {
   };
   parts.push(part);
   addPartEventListeners(part);
-  toggleHandles(part, false);
+  // add default corner vertices for easier dragging
+  addCornerVertices(part);
+  // select the new part so all handles are visible
   selectPart(part);
   updateCanvasSize();
 }
@@ -628,6 +630,9 @@ function createPartFromData(p) {
     vertexHandles,
   };
 
+  // ensure corner vertices are present
+  addCornerVertices(partData);
+
   symVertices.forEach((v) => {
     v.handleLeft.addEventListener("mousedown", (evt) =>
       startVertexDrag(evt, partData, v, "left")
@@ -757,6 +762,9 @@ function applyShapeToPart(part, data) {
       part.vertexHandles.push(hl, hr);
     });
   }
+
+  // ensure default corner vertices exist
+  addCornerVertices(part);
 
   updatePolygonShape(part);
   updateVertexHandles(part);
@@ -895,6 +903,43 @@ function toggleSpecialVertex(e, part) {
     const fromLeft = e.offsetX - part.x < part.width / 2;
     startVertexDrag(e, part, vertex, fromLeft ? "left" : "right");
   }
+  updatePolygonShape(part);
+  updateVertexHandles(part);
+}
+
+function createVertexHandle(part, y) {
+  const vertex = { y, dx: 0 };
+  const hl = document.createElementNS(svgNS, 'rect');
+  hl.setAttribute('width', 8);
+  hl.setAttribute('height', 8);
+  hl.classList.add('vertex-handle');
+  part.g.appendChild(hl);
+  hl.addEventListener('mousedown', (evt) => startVertexDrag(evt, part, vertex, 'left'));
+  hl.addEventListener('dblclick', () => setVertexWidth(part, vertex));
+  const hr = document.createElementNS(svgNS, 'rect');
+  hr.setAttribute('width', 8);
+  hr.setAttribute('height', 8);
+  hr.classList.add('vertex-handle');
+  part.g.appendChild(hr);
+  hr.addEventListener('mousedown', (evt) => startVertexDrag(evt, part, vertex, 'right'));
+  hr.addEventListener('dblclick', () => setVertexWidth(part, vertex));
+  vertex.handleLeft = hl;
+  vertex.handleRight = hr;
+  if (!part.symVertices) part.symVertices = [];
+  if (!part.vertexHandles) part.vertexHandles = [];
+  part.symVertices.push(vertex);
+  part.vertexHandles.push(hl, hr);
+  return vertex;
+}
+
+function addCornerVertices(part) {
+  if (!part.symVertices) part.symVertices = [];
+  if (!part.vertexHandles) part.vertexHandles = [];
+  const tol = 0.001;
+  const hasTop = part.symVertices.some((v) => Math.abs(v.y) < tol);
+  if (!hasTop) createVertexHandle(part, 0);
+  const hasBottom = part.symVertices.some((v) => Math.abs(v.y - part.height) < tol);
+  if (!hasBottom) createVertexHandle(part, part.height);
   updatePolygonShape(part);
   updateVertexHandles(part);
 }
