@@ -61,10 +61,30 @@ function centerDiagram() {
   const cx = (left + right) / 2;
   const cy = (top + bottom) / 2;
   const desiredLeft = cx * zoom - canvasArea.clientWidth / 2;
-  canvasArea.scrollLeft = Math.max(0, desiredLeft);
-  const margin = desiredLeft < 0 ? -desiredLeft : 0;
-  canvas.style.marginLeft = `${margin}px`;
-  canvasArea.scrollTop = cy * zoom - canvasArea.clientHeight / 2;
+  const maxLeft = canvas.scrollWidth - canvasArea.clientWidth;
+  if (desiredLeft < 0) {
+    canvasArea.scrollLeft = 0;
+    canvas.style.marginLeft = `${-desiredLeft}px`;
+  } else if (desiredLeft > maxLeft) {
+    canvasArea.scrollLeft = maxLeft;
+    canvas.style.marginLeft = `${-(desiredLeft - maxLeft)}px`;
+  } else {
+    canvasArea.scrollLeft = desiredLeft;
+    canvas.style.marginLeft = "0";
+  }
+
+  const desiredTop = cy * zoom - canvasArea.clientHeight / 2;
+  const maxTop = canvas.scrollHeight - canvasArea.clientHeight;
+  if (desiredTop < 0) {
+    canvasArea.scrollTop = 0;
+    canvas.style.marginTop = `${-desiredTop}px`;
+  } else if (desiredTop > maxTop) {
+    canvasArea.scrollTop = maxTop;
+    canvas.style.marginTop = `${-(desiredTop - maxTop)}px`;
+  } else {
+    canvasArea.scrollTop = desiredTop;
+    canvas.style.marginTop = "0";
+  }
 }
 
 // --- Toolbar buttons ---
@@ -1412,8 +1432,10 @@ function showContextMenu(e, part) {
   document.getElementById('setSizeMenu').style.display = part ? 'block' : 'none';
   document.getElementById('removeBody').style.display = part ? 'block' : 'none';
   const rect = canvasArea.getBoundingClientRect();
-  menu.style.left = `${e.clientX - rect.left + canvasArea.scrollLeft}px`;
-  menu.style.top = `${e.clientY - rect.top + canvasArea.scrollTop}px`;
+  const offsetX = parseFloat(canvas.style.marginLeft) || 0;
+  const offsetY = parseFloat(canvas.style.marginTop) || 0;
+  menu.style.left = `${e.clientX - rect.left + canvasArea.scrollLeft - offsetX}px`;
+  menu.style.top = `${e.clientY - rect.top + canvasArea.scrollTop - offsetY}px`;
   menu.style.display = "block";
 }
 
