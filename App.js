@@ -1070,8 +1070,7 @@ function updateConnectorLabelClass(label, state) {
 let resizing = false,
   startY = 0,
   startHeight = 0,
-  resizePart = null,
-  startVertYs = null;
+  resizePart = null;
 function startResize(e, part) {
   e.preventDefault();
   saveState();
@@ -1079,7 +1078,6 @@ function startResize(e, part) {
   startY = e.touches ? e.touches[0].clientY : e.clientY;
   startHeight = part.height;
   resizePart = part;
-  startVertYs = part.symVertices ? part.symVertices.map(v => v.y) : null;
   window.addEventListener("mousemove", doResize);
   window.addEventListener("touchmove", doResize, { passive: false });
   window.addEventListener("mouseup", stopResize);
@@ -1088,7 +1086,7 @@ function startResize(e, part) {
 function doResize(e) {
   if (!resizing) return;
   const currentY = e.touches ? e.touches[0].clientY : e.clientY;
-  const delta = (currentY - startY) / zoom;
+  const delta = currentY - startY;
   const newH = Math.max(30, startHeight + delta);
   resizePart.height = newH;
   resizePart.rect.setAttribute("height", newH);
@@ -1098,9 +1096,9 @@ function doResize(e) {
   resizePart.bottomLabel.setAttribute("y", resizePart.y + newH + 6);
 
   const scale = newH / startHeight;
-  if (resizePart.symVertices && startVertYs) {
-    resizePart.symVertices.forEach((v, i) => {
-      v.y = startVertYs[i] * scale;
+  if (resizePart.symVertices) {
+    resizePart.symVertices.forEach((v) => {
+      v.y *= scale;
     });
   }
   updatePolygonShape(resizePart);
@@ -1128,7 +1126,6 @@ function stopResize() {
   window.removeEventListener("touchmove", doResize);
   window.removeEventListener("mouseup", stopResize);
   window.removeEventListener("touchend", stopResize);
-  startVertYs = null;
   updateCanvasSize();
 }
 
@@ -1156,7 +1153,7 @@ function startHResize(e, part, dir) {
 function doHResize(e) {
   if (!hResizing) return;
   const currentX = e.touches ? e.touches[0].clientX : e.clientX;
-  const delta = (hDir === "left" ? startX - currentX : currentX - startX) / zoom;
+  const delta = hDir === "left" ? startX - currentX : currentX - startX;
   const newW = Math.max(30, startWidth + delta * 2);
   hResizePart.width = newW;
   hResizePart.x = centerX - newW / 2;
@@ -1318,7 +1315,7 @@ function doVertexDrag(e) {
   if (!vertexDrag) return;
   const currentX = e.clientX;
   const { part, vertex, side, startX, startDx } = vertexDrag;
-  const delta = (side === "left" ? startX - currentX : currentX - startX) / zoom;
+  const delta = side === "left" ? startX - currentX : currentX - startX;
   const minDx = -part.width / 2 + 1;
   vertex.dx = Math.max(minDx, startDx + delta);
   updatePolygonShape(part);
