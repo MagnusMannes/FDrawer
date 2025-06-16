@@ -1079,6 +1079,12 @@ function startResize(e, part) {
   startY = e.touches ? e.touches[0].clientY : e.clientY;
   startHeight = part.height;
   resizePart = part;
+  if (part.symVertices) {
+    part.symVertices.forEach(v => {
+      if (v.y > part.height) v.y = part.height;
+      if (v.y < 0) v.y = 0;
+    });
+  }
   startVertYs = part.symVertices ? part.symVertices.map(v => v.y) : null;
   window.addEventListener("mousemove", doResize);
   window.addEventListener("touchmove", doResize, { passive: false });
@@ -1101,6 +1107,8 @@ function doResize(e) {
   if (resizePart.symVertices && startVertYs) {
     resizePart.symVertices.forEach((v, i) => {
       v.y = startVertYs[i] * scale;
+      if (v.y > newH) v.y = newH;
+      if (v.y < 0) v.y = 0;
     });
   }
   updatePolygonShape(resizePart);
@@ -1241,6 +1249,8 @@ function updatePartHeight(part, newH) {
   if (part.symVertices) {
     part.symVertices.forEach(v => {
       v.y *= scale;
+      if (v.y > newH) v.y = newH;
+      if (v.y < 0) v.y = 0;
     });
   }
   updatePolygonShape(part);
