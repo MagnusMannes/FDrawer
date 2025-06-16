@@ -206,6 +206,8 @@ function updateZoom() {
   canvas.style.transformOrigin = "0 0";
   canvas.style.transform = `scale(${zoom})`;
   centerDiagram();
+  // ensure centering after transform is applied
+  requestAnimationFrame(centerDiagram);
 }
 
 function getSnappedPosition(x, y, showIndicator = true) {
@@ -1409,8 +1411,9 @@ function showContextMenu(e, part) {
   document.getElementById('pasteShapeMenu').style.display = copiedShape ? 'block' : 'none';
   document.getElementById('setSizeMenu').style.display = part ? 'block' : 'none';
   document.getElementById('removeBody').style.display = part ? 'block' : 'none';
-  menu.style.left = `${e.clientX}px`;
-  menu.style.top = `${e.clientY}px`;
+  const rect = canvasArea.getBoundingClientRect();
+  menu.style.left = `${e.clientX - rect.left + canvasArea.scrollLeft}px`;
+  menu.style.top = `${e.clientY - rect.top + canvasArea.scrollTop}px`;
   menu.style.display = "block";
 }
 
