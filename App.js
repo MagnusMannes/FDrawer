@@ -439,10 +439,16 @@ function addBody() {
   saveState();
   const width = 60,
     height = 120;
-  const x = canvas.clientWidth / 2 - width / 2;
-  const y = parts.length
-    ? parts[parts.length - 1].y + parts[parts.length - 1].height
-    : 20;
+  let x;
+  let y;
+  if (parts.length) {
+    const last = parts[parts.length - 1];
+    x = last.x + last.width / 2 - width / 2;
+    y = last.y + last.height;
+  } else {
+    x = canvas.clientWidth / 2 - width / 2;
+    y = 20;
+  }
 
   const g = document.createElementNS(svgNS, "g");
 
