@@ -56,17 +56,15 @@ function updateCanvasSize() {
 
 function centerDiagram() {
   if (!parts.length) return;
+  const axisOffset = 20; // account for left axis in centering
   const left = Math.min(...parts.map((p) => p.x));
   const right = Math.max(...parts.map((p) => p.x + p.width));
-  const top = Math.min(...parts.map((p) => p.y));
-  const bottom = Math.max(...parts.map((p) => p.y + p.height));
-  const cx = (left + right) / 2;
-  const cy = (top + bottom) / 2;
+  const cx = (left - axisOffset + right) / 2;
   const desiredLeft = cx * zoom - canvasArea.clientWidth / 2;
   canvasArea.scrollLeft = Math.max(0, desiredLeft);
   const margin = desiredLeft < 0 ? -desiredLeft : 0;
   canvas.style.marginLeft = `${margin}px`;
-  canvasArea.scrollTop = cy * zoom - canvasArea.clientHeight / 2;
+  // vertical centering removed
 }
 
 // --- Toolbar buttons ---
