@@ -1105,8 +1105,11 @@ function doResize(e) {
 
   const scale = newH / startHeight;
   if (resizePart.symVertices && startVertYs) {
+    const tol = 0.001;
     resizePart.symVertices.forEach((v, i) => {
       v.y = startVertYs[i] * scale;
+      if (Math.abs(startVertYs[i] - startHeight) < tol) v.y = newH;
+      if (Math.abs(startVertYs[i]) < tol) v.y = 0;
       if (v.y > newH) v.y = newH;
       if (v.y < 0) v.y = 0;
     });
@@ -1239,7 +1242,8 @@ function applyNewWidth(part, newW) {
 
 function updatePartHeight(part, newH) {
   saveState();
-  const scale = newH / part.height;
+  const oldH = part.height;
+  const scale = newH / oldH;
   part.height = newH;
   part.rect.setAttribute('height', newH);
   part.handle.setAttribute('y', part.y + newH - 5);
@@ -1247,8 +1251,12 @@ function updatePartHeight(part, newH) {
   part.rightHandle.setAttribute('y', part.y + newH / 2 - 5);
   part.bottomLabel.setAttribute('y', part.y + newH + 6);
   if (part.symVertices) {
-    part.symVertices.forEach(v => {
+    const tol = 0.001;
+    part.symVertices.forEach((v) => {
+      const origY = v.y;
       v.y *= scale;
+      if (Math.abs(origY - oldH) < tol) v.y = newH;
+      if (Math.abs(origY) < tol) v.y = 0;
       if (v.y > newH) v.y = newH;
       if (v.y < 0) v.y = 0;
     });
