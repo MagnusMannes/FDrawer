@@ -8,6 +8,8 @@ const drawLayer = document.createElementNS(svgNS, "g");
 canvas.appendChild(drawLayer);
 const axisLayer = document.createElementNS(svgNS, "g");
 canvas.appendChild(axisLayer);
+const uiLayer = document.createElementNS(svgNS, "g");
+canvas.appendChild(uiLayer);
 const parts = [];
 const drawnShapes = [];
 let tempShape = null;
@@ -24,6 +26,16 @@ let drawMode = null;
 let lineStart = null;
 let curvePoints = [];
 let circleCenter = null;
+let snapEnabled = false;
+let snapIndicator = null;
+
+snapIndicator = document.createElementNS(svgNS, 'circle');
+snapIndicator.setAttribute('r', 4);
+snapIndicator.setAttribute('fill', 'none');
+snapIndicator.setAttribute('stroke', 'red');
+snapIndicator.style.display = 'none';
+snapIndicator.classList.add('snap-indicator');
+uiLayer.appendChild(snapIndicator);
 
 const APP_VERSION = "1.0";
 document.getElementById("version").textContent = APP_VERSION;
@@ -91,11 +103,17 @@ document.getElementById('zoomOut').addEventListener('click', () => {
   updateZoom();
 });
 
+const snapBtn = document.getElementById('toggleSnap');
+snapBtn.addEventListener('click', () => {
+  snapEnabled = !snapEnabled;
+  snapBtn.classList.toggle('active', snapEnabled);
+  snapIndicator.style.display = 'none';
+});
+
 function handleCanvasClick(e) {
   if (!drawMode) return;
   e.stopPropagation();
-  const x = e.offsetX;
-  const y = e.offsetY;
+  let { x, y } = getSnappedPosition(e.offsetX, e.offsetY, false);
   if (drawMode === 'line') {
     if (!lineStart) {
       lineStart = { x, y };
@@ -162,9 +180,8 @@ canvas.addEventListener('click', handleCanvasClick, true);
 canvas.addEventListener('mousemove', handleMouseMove, true);
 
 function handleMouseMove(e) {
+  const { x, y } = getSnappedPosition(e.offsetX, e.offsetY);
   if (!drawMode || !tempShape) return;
-  const x = e.offsetX;
-  const y = e.offsetY;
   if (drawMode === 'line') {
     tempShape.setAttribute('x2', x);
     tempShape.setAttribute('y2', y);
@@ -189,6 +206,46 @@ function updateZoom() {
   canvas.style.transformOrigin = "0 0";
   canvas.style.transform = `scale(${zoom})`;
   centerDiagram();
+}
+
+function getSnappedPosition(x, y, showIndicator = true) {
+  if (!snapEnabled) {
+    if (showIndicator) snapIndicator.style.display = 'none';
+    return { x, y };
+  }
+  let closest = null;
+  let minDist = 8;
+  parts.forEach((p) => {
+    const pts = [
+      [p.x, p.y],
+      [p.x + p.width / 2, p.y],
+      [p.x + p.width, p.y],
+      [p.x, p.y + p.height / 2],
+      [p.x + p.width, p.y + p.height / 2],
+      [p.x, p.y + p.height],
+      [p.x + p.width / 2, p.y + p.height],
+      [p.x + p.width, p.y + p.height],
+    ];
+    pts.forEach(([px, py]) => {
+      const dx = px - x;
+      const dy = py - y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < minDist) {
+        minDist = dist;
+        closest = { x: px, y: py };
+      }
+    });
+  });
+  if (closest) {
+    if (showIndicator) {
+      snapIndicator.style.display = 'block';
+      snapIndicator.setAttribute('cx', closest.x);
+      snapIndicator.setAttribute('cy', closest.y);
+    }
+    return closest;
+  }
+  if (showIndicator) snapIndicator.style.display = 'none';
+  return { x, y };
 }
 
 function saveState() {
