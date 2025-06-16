@@ -22,9 +22,6 @@ const canvasArea = document.getElementById("canvas_area");
 let zoom = 1;
 const undoStack = [];
 
-let selectedShape = null;
-let shapeHandles = [];
-
 let drawMode = null;
 let lineStart = null;
 let curvePoints = [];
@@ -131,8 +128,7 @@ function handleCanvasClick(e) {
       tempShape.setAttribute('x2', x);
       tempShape.setAttribute('y2', y);
       tempShape.classList.remove('preview-shape');
-      const obj = { type: 'line', x1: lineStart.x, y1: lineStart.y, x2: x, y2: y, stroke: 2 };
-      addShape(obj, tempShape);
+      drawnShapes.push({ type: 'line', x1: lineStart.x, y1: lineStart.y, x2: x, y2: y });
       saveState();
       tempShape = null;
       setDrawMode(null);
@@ -147,14 +143,12 @@ function handleCanvasClick(e) {
       const d = `M ${curvePoints[0].x} ${curvePoints[0].y} Q ${curvePoints[1].x} ${curvePoints[1].y} ${curvePoints[2].x} ${curvePoints[2].y}`;
       tempShape.setAttribute('d', d);
       tempShape.classList.remove('preview-shape');
-      const obj = {
+      drawnShapes.push({
         type: 'curve',
         p0: curvePoints[0],
         p1: curvePoints[1],
         p2: curvePoints[2],
-        stroke: 2,
-      };
-      addShape(obj, tempShape);
+      });
       saveState();
       tempShape = null;
       setDrawMode(null);
@@ -174,8 +168,7 @@ function handleCanvasClick(e) {
       const r = Math.sqrt(dx * dx + dy * dy);
       tempShape.setAttribute('r', r);
       tempShape.classList.remove('preview-shape');
-      const obj = { type: 'circle', cx: circleCenter.x, cy: circleCenter.y, r, stroke: 2 };
-      addShape(obj, tempShape);
+      drawnShapes.push({ type: 'circle', cx: circleCenter.x, cy: circleCenter.y, r });
       saveState();
       tempShape = null;
       setDrawMode(null);
@@ -270,208 +263,6 @@ function undo() {
   if (!undoStack.length) return;
   const state = undoStack.pop();
   loadFromData(JSON.parse(state));
-}
-
-function addShape(shape, elem) {
-  shape.element = elem;
-  drawnShapes.push(shape);
-  addShapeEventListeners(elem, shape);
-}
-
-function addShapeEventListeners(elem, shape) {
-  elem.addEventListener('click', (e) => {
-    e.stopPropagation();
-    selectShape(shape);
-  });
-  elem.addEventListener('contextmenu', (e) => {
-    e.preventDefault();
-    deleteShape(shape);
-  });
-  elem.addEventListener('dblclick', () => setShapeWidth(shape));
-  elem.style.pointerEvents = 'all';
-}
-
-function selectShape(shape) {
-  clearShapeSelection();
-  selectedShape = shape;
-  shape.element.classList.add('selected');
-  if (selectedPart) {
-    attachShapeToPart(shape, selectedPart);
-  }
-  createShapeHandles(shape);
-}
-
-function clearShapeSelection() {
-  if (selectedShape) {
-    selectedShape.element.classList.remove('selected');
-  }
-  shapeHandles.forEach((h) => h.remove());
-  shapeHandles = [];
-  selectedShape = null;
-}
-
-function createHandle(x, y) {
-  const h = document.createElementNS(svgNS, 'circle');
-  h.setAttribute('r', 4);
-  h.setAttribute('cx', x);
-  h.setAttribute('cy', y);
-  h.classList.add('shape-handle');
-  uiLayer.appendChild(h);
-  shapeHandles.push(h);
-  return h;
-}
-
-let dragInfo = null;
-function createShapeHandles(shape) {
-  if (shape.type === 'line') {
-    const h1 = createHandle(shape.x1, shape.y1);
-    const h2 = createHandle(shape.x2, shape.y2);
-    h1.addEventListener('mousedown', (e) => startDrag(e, shape, 'p1'));
-    h2.addEventListener('mousedown', (e) => startDrag(e, shape, 'p2'));
-  } else if (shape.type === 'circle') {
-    const h1 = createHandle(shape.cx, shape.cy);
-    const h2 = createHandle(shape.cx + shape.r, shape.cy);
-    h1.addEventListener('mousedown', (e) => startDrag(e, shape, 'center'));
-    h2.addEventListener('mousedown', (e) => startDrag(e, shape, 'radius'));
-  }
-}
-
-function startDrag(e, shape, point) {
-  e.preventDefault();
-  dragInfo = { shape, point, startX: e.clientX, startY: e.clientY };
-  window.addEventListener('mousemove', doDrag);
-  window.addEventListener('mouseup', stopDrag);
-}
-
-function doDrag(e) {
-  if (!dragInfo) return;
-  const { shape, point, startX, startY } = dragInfo;
-  const dx = (e.clientX - startX) / zoom;
-  const dy = (e.clientY - startY) / zoom;
-  if (shape.type === 'line') {
-    if (point === 'p1') {
-      shape.x1 += dx;
-      shape.y1 += dy;
-      dragInfo.startX = e.clientX;
-      dragInfo.startY = e.clientY;
-    } else if (point === 'p2') {
-      shape.x2 += dx;
-      shape.y2 += dy;
-      dragInfo.startX = e.clientX;
-      dragInfo.startY = e.clientY;
-    }
-    shape.element.setAttribute('x1', shape.x1);
-    shape.element.setAttribute('y1', shape.y1);
-    shape.element.setAttribute('x2', shape.x2);
-    shape.element.setAttribute('y2', shape.y2);
-    shapeHandles[0].setAttribute('cx', shape.x1);
-    shapeHandles[0].setAttribute('cy', shape.y1);
-    shapeHandles[1].setAttribute('cx', shape.x2);
-    shapeHandles[1].setAttribute('cy', shape.y2);
-  } else if (shape.type === 'circle') {
-    if (point === 'center') {
-      shape.cx += dx;
-      shape.cy += dy;
-      dragInfo.startX = e.clientX;
-      dragInfo.startY = e.clientY;
-    } else if (point === 'radius') {
-      const nx = shape.cx + shape.r + dx;
-      const ny = shape.cy + dy;
-      shape.r = Math.sqrt((nx - shape.cx) ** 2 + (ny - shape.cy) ** 2);
-      dragInfo.startX = e.clientX;
-      dragInfo.startY = e.clientY;
-    }
-    shape.element.setAttribute('cx', shape.cx);
-    shape.element.setAttribute('cy', shape.cy);
-    shape.element.setAttribute('r', shape.r);
-    shapeHandles[0].setAttribute('cx', shape.cx);
-    shapeHandles[0].setAttribute('cy', shape.cy);
-    shapeHandles[1].setAttribute('cx', shape.cx + shape.r);
-    shapeHandles[1].setAttribute('cy', shape.cy);
-  }
-  if (shape.attachedPart) updateShapeRel(shape);
-}
-
-function stopDrag() {
-  if (dragInfo) saveState();
-  dragInfo = null;
-  window.removeEventListener('mousemove', doDrag);
-  window.removeEventListener('mouseup', stopDrag);
-}
-
-function deleteShape(shape) {
-  saveState();
-  const idx = drawnShapes.indexOf(shape);
-  if (idx !== -1) drawnShapes.splice(idx, 1);
-  if (shape.attachedPart && shape.attachedPart.attachedShapes) {
-    const a = shape.attachedPart.attachedShapes.indexOf(shape);
-    if (a !== -1) shape.attachedPart.attachedShapes.splice(a, 1);
-  }
-  if (shape.element) shape.element.remove();
-  clearShapeSelection();
-}
-
-function setShapeWidth(shape) {
-  const input = prompt('Enter stroke width in px:', shape.stroke || 2);
-  if (!input) return;
-  const w = parseFloat(input);
-  if (isNaN(w)) return;
-  saveState();
-  shape.stroke = w;
-  shape.element.setAttribute('stroke-width', w);
-}
-
-function attachShapeToPart(shape, part) {
-  if (!part.attachedShapes) part.attachedShapes = [];
-  if (!part.attachedShapes.includes(shape)) part.attachedShapes.push(shape);
-  shape.attachedPart = part;
-  updateShapeRel(shape);
-}
-
-function updateShapeRel(shape) {
-  const part = shape.attachedPart;
-  if (!part) return;
-  if (shape.type === 'line') {
-    shape.rel = {
-      x1: (shape.x1 - part.x) / part.width,
-      y1: (shape.y1 - part.y) / part.height,
-      x2: (shape.x2 - part.x) / part.width,
-      y2: (shape.y2 - part.y) / part.height,
-    };
-  } else if (shape.type === 'circle') {
-    shape.rel = {
-      cx: (shape.cx - part.x) / part.width,
-      cy: (shape.cy - part.y) / part.height,
-      rX: shape.r / part.width,
-      rY: shape.r / part.height,
-    };
-  }
-}
-
-function updateAttachedShapes(part) {
-  if (!part.attachedShapes) return;
-  part.attachedShapes.forEach((shape) => {
-    if (!shape.rel) return;
-    if (shape.type === 'line') {
-      shape.x1 = part.x + shape.rel.x1 * part.width;
-      shape.y1 = part.y + shape.rel.y1 * part.height;
-      shape.x2 = part.x + shape.rel.x2 * part.width;
-      shape.y2 = part.y + shape.rel.y2 * part.height;
-      shape.element.setAttribute('x1', shape.x1);
-      shape.element.setAttribute('y1', shape.y1);
-      shape.element.setAttribute('x2', shape.x2);
-      shape.element.setAttribute('y2', shape.y2);
-    } else if (shape.type === 'circle') {
-      shape.cx = part.x + shape.rel.cx * part.width;
-      shape.cy = part.y + shape.rel.cy * part.height;
-      const rX = part.width * shape.rel.rX;
-      const rY = part.height * shape.rel.rY;
-      shape.r = (rX + rY) / 2;
-      shape.element.setAttribute('cx', shape.cx);
-      shape.element.setAttribute('cy', shape.cy);
-      shape.element.setAttribute('r', shape.r);
-    }
-  });
 }
 
 document.getElementById("colorPicker").addEventListener("input", (e) => {
@@ -589,7 +380,6 @@ document.getElementById("resetView").addEventListener("click", () => {
 document.addEventListener("click", () => {
   menu.style.display = "none";
   contextPart = null;
-  clearShapeSelection();
 });
 
 document.getElementById("exportBtn").addEventListener("click", () => {
@@ -614,26 +404,7 @@ document.getElementById("exportBtn").addEventListener("click", () => {
       })),
       symVertices: (p.symVertices || []).map((v) => ({ y: v.y, dx: v.dx })),
     })),
-    drawnShapes: drawnShapes.map((s) => {
-      const d = { type: s.type, stroke: s.stroke };
-      if (s.type === 'line') {
-        d.x1 = s.x1;
-        d.y1 = s.y1;
-        d.x2 = s.x2;
-        d.y2 = s.y2;
-      } else if (s.type === 'curve') {
-        d.p0 = s.p0;
-        d.p1 = s.p1;
-        d.p2 = s.p2;
-      } else if (s.type === 'circle') {
-        d.cx = s.cx;
-        d.cy = s.cy;
-        d.r = s.r;
-      }
-      if (s.attachedPart) d.attachedPart = parts.indexOf(s.attachedPart);
-      if (s.rel) d.rel = s.rel;
-      return d;
-    }),
+    drawnShapes,
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], {
     type: "application/json",
@@ -751,7 +522,6 @@ function addBody() {
     rightHandle,
     topLabel,
     bottomLabel,
-    attachedShapes: [],
   };
   parts.push(part);
   addPartEventListeners(part);
@@ -923,7 +693,6 @@ function createPartFromData(p) {
     specialForms,
     symVertices,
     vertexHandles,
-    attachedShapes: [],
   };
 
   // ensure corner vertices are present
@@ -1355,7 +1124,6 @@ function doResize(e) {
   }
   updatePolygonShape(resizePart);
   updateVertexHandles(resizePart);
-  updateAttachedShapes(resizePart);
 
   const idx = parts.indexOf(resizePart);
   let baseY = resizePart.y + newH;
@@ -1370,7 +1138,6 @@ function doResize(e) {
     if (parts[i].specialIcon) {
       parts[i].specialIcon.setAttribute("y", baseY + parts[i].height / 2 - 7);
     }
-    updateAttachedShapes(parts[i]);
     baseY += parts[i].height;
   }
 }
@@ -1438,7 +1205,6 @@ function updatePartWidth(part) {
   }
   updatePolygonShape(part);
   updateVertexHandles(part);
-  updateAttachedShapes(part);
 }
 
 // -- Dimension Helpers --
@@ -1479,7 +1245,6 @@ function applyNewWidth(part, newW) {
   part.width = newW;
   part.x = center - newW / 2;
   updatePartWidth(part);
-  updateAttachedShapes(part);
   updateCanvasSize();
 }
 
@@ -1506,7 +1271,6 @@ function updatePartHeight(part, newH) {
   }
   updatePolygonShape(part);
   updateVertexHandles(part);
-  updateAttachedShapes(part);
   const idx = parts.indexOf(part);
   let baseY = part.y + newH;
   for (let i = idx + 1; i < parts.length; i++) {
@@ -1520,7 +1284,6 @@ function updatePartHeight(part, newH) {
     if (parts[i].specialIcon) {
       parts[i].specialIcon.setAttribute('y', baseY + parts[i].height / 2 - 7);
     }
-    updateAttachedShapes(parts[i]);
     baseY += parts[i].height;
   }
   updateCanvasSize();
@@ -1614,13 +1377,6 @@ function removePart(part) {
   saveState();
   const idx = parts.indexOf(part);
   if (idx === -1) return;
-  if (part.attachedShapes) {
-    part.attachedShapes.forEach((sh) => {
-      const si = drawnShapes.indexOf(sh);
-      if (si !== -1) drawnShapes.splice(si, 1);
-      if (sh.element) sh.element.remove();
-    });
-  }
   canvas.removeChild(part.g);
   parts.splice(idx, 1);
   if (selectedPart === part) selectedPart = null;
@@ -1646,7 +1402,6 @@ function removePart(part) {
     }
     updatePolygonShape(p);
     updateVertexHandles(p);
-    updateAttachedShapes(p);
     baseY += p.height;
   }
   updateCanvasSize();
@@ -1687,13 +1442,7 @@ function createDrawnShapeFromData(s) {
   }
   if (elem) {
     elem.classList.add('drawn-shape');
-    if (s.stroke) elem.setAttribute('stroke-width', s.stroke);
     drawLayer.appendChild(elem);
-    addShape(s, elem);
-    if (typeof s.attachedPart === 'number' && parts[s.attachedPart]) {
-      s.attachedPart = parts[s.attachedPart];
-      attachShapeToPart(s, s.attachedPart);
-    }
   }
 }
 
@@ -1795,6 +1544,7 @@ function loadFromData(data) {
     data.drawnShapes.forEach((s) => {
       createDrawnShapeFromData(s);
     });
+    drawnShapes.push(...data.drawnShapes);
   }
   updateCanvasSize();
 }
