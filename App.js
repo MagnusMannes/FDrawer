@@ -429,38 +429,6 @@ function addBody() {
   rightHandle.classList.add("h-handle");
   g.appendChild(rightHandle);
 
-  const tlHandle = document.createElementNS(svgNS, "rect");
-  tlHandle.setAttribute("width", 8);
-  tlHandle.setAttribute("height", 8);
-  tlHandle.setAttribute("x", x - 4);
-  tlHandle.setAttribute("y", y - 4);
-  tlHandle.classList.add("corner-handle");
-  g.appendChild(tlHandle);
-
-  const trHandle = document.createElementNS(svgNS, "rect");
-  trHandle.setAttribute("width", 8);
-  trHandle.setAttribute("height", 8);
-  trHandle.setAttribute("x", x + width - 4);
-  trHandle.setAttribute("y", y - 4);
-  trHandle.classList.add("corner-handle");
-  g.appendChild(trHandle);
-
-  const blHandle = document.createElementNS(svgNS, "rect");
-  blHandle.setAttribute("width", 8);
-  blHandle.setAttribute("height", 8);
-  blHandle.setAttribute("x", x - 4);
-  blHandle.setAttribute("y", y + height - 4);
-  blHandle.classList.add("corner-handle");
-  g.appendChild(blHandle);
-
-  const brHandle = document.createElementNS(svgNS, "rect");
-  brHandle.setAttribute("width", 8);
-  brHandle.setAttribute("height", 8);
-  brHandle.setAttribute("x", x + width - 4);
-  brHandle.setAttribute("y", y + height - 4);
-  brHandle.classList.add("corner-handle");
-  g.appendChild(brHandle);
-
   const topLabel = createConnectorLabel(x + width / 2, y - 6);
   const bottomLabel = createConnectorLabel(x + width / 2, y + height + 6);
   g.appendChild(topLabel);
@@ -487,13 +455,8 @@ function addBody() {
     handle,
     leftHandle,
     rightHandle,
-    tlHandle,
-    trHandle,
-    blHandle,
-    brHandle,
     topLabel,
     bottomLabel,
-    cornerHandles: [tlHandle, trHandle, blHandle, brHandle],
   };
   parts.push(part);
   addPartEventListeners(part);
@@ -564,38 +527,6 @@ function createPartFromData(p) {
   rightHandle.setAttribute("y", p.y + p.height / 2 - 5);
   rightHandle.classList.add("h-handle");
   g.appendChild(rightHandle);
-
-  const tlHandle = document.createElementNS(svgNS, "rect");
-  tlHandle.setAttribute("width", 8);
-  tlHandle.setAttribute("height", 8);
-  tlHandle.setAttribute("x", p.x - 4);
-  tlHandle.setAttribute("y", p.y - 4);
-  tlHandle.classList.add("corner-handle");
-  g.appendChild(tlHandle);
-
-  const trHandle = document.createElementNS(svgNS, "rect");
-  trHandle.setAttribute("width", 8);
-  trHandle.setAttribute("height", 8);
-  trHandle.setAttribute("x", p.x + p.width - 4);
-  trHandle.setAttribute("y", p.y - 4);
-  trHandle.classList.add("corner-handle");
-  g.appendChild(trHandle);
-
-  const blHandle = document.createElementNS(svgNS, "rect");
-  blHandle.setAttribute("width", 8);
-  blHandle.setAttribute("height", 8);
-  blHandle.setAttribute("x", p.x - 4);
-  blHandle.setAttribute("y", p.y + p.height - 4);
-  blHandle.classList.add("corner-handle");
-  g.appendChild(blHandle);
-
-  const brHandle = document.createElementNS(svgNS, "rect");
-  brHandle.setAttribute("width", 8);
-  brHandle.setAttribute("height", 8);
-  brHandle.setAttribute("x", p.x + p.width - 4);
-  brHandle.setAttribute("y", p.y + p.height - 4);
-  brHandle.classList.add("corner-handle");
-  g.appendChild(brHandle);
 
   const topLabel = createConnectorLabel(p.x + p.width / 2, p.y - 6);
   topLabel.textContent = labelFor(p.topConnector);
@@ -687,10 +618,6 @@ function createPartFromData(p) {
     handle,
     leftHandle,
     rightHandle,
-    tlHandle,
-    trHandle,
-    blHandle,
-    brHandle,
     topLabel,
     bottomLabel,
     width: p.width,
@@ -699,7 +626,6 @@ function createPartFromData(p) {
     specialForms,
     symVertices,
     vertexHandles,
-    cornerHandles: [tlHandle, trHandle, blHandle, brHandle],
   };
 
   symVertices.forEach((v) => {
@@ -720,7 +646,6 @@ function createPartFromData(p) {
   parts.push(partData);
   updatePolygonShape(partData);
   updateVertexHandles(partData);
-  updateCornerHandles(partData);
   addPartEventListeners(partData);
   toggleHandles(partData, false);
   updateCanvasSize();
@@ -835,7 +760,6 @@ function applyShapeToPart(part, data) {
 
   updatePolygonShape(part);
   updateVertexHandles(part);
-  updateCornerHandles(part);
   toggleHandles(part, false);
 }
 
@@ -901,17 +825,6 @@ function addPartEventListeners(part) {
       applyNewWidth(part, w);
     }
   });
-  if (part.cornerHandles) {
-    const [tl, tr, bl, br] = part.cornerHandles;
-    tl.addEventListener("mousedown", (e) => startCornerResize(e, part, "tl"));
-    tl.addEventListener("touchstart", (e) => startCornerResize(e, part, "tl"), { passive: false });
-    tr.addEventListener("mousedown", (e) => startCornerResize(e, part, "tr"));
-    tr.addEventListener("touchstart", (e) => startCornerResize(e, part, "tr"), { passive: false });
-    bl.addEventListener("mousedown", (e) => startCornerResize(e, part, "bl"));
-    bl.addEventListener("touchstart", (e) => startCornerResize(e, part, "bl"), { passive: false });
-    br.addEventListener("mousedown", (e) => startCornerResize(e, part, "br"));
-    br.addEventListener("touchstart", (e) => startCornerResize(e, part, "br"), { passive: false });
-  }
 }
 
 // --- Selection & Connector Logic ---
@@ -1088,7 +1001,6 @@ function doResize(e) {
   }
   updatePolygonShape(resizePart);
   updateVertexHandles(resizePart);
-  updateCornerHandles(resizePart);
 
   const idx = parts.indexOf(resizePart);
   let baseY = resizePart.y + newH;
@@ -1154,82 +1066,6 @@ function stopHResize() {
   updateCanvasSize();
 }
 
-// --- Corner Resize Logic ---
-let cResizing = false,
-  cStartX = 0,
-  cStartY = 0,
-  cOrigW = 0,
-  cOrigH = 0,
-  cOrigX = 0,
-  cOrigY = 0,
-  cDir = "tl",
-  cPart = null;
-function startCornerResize(e, part, dir) {
-  e.preventDefault();
-  saveState();
-  const t = e.touches ? e.touches[0] : e;
-  cResizing = true;
-  cStartX = t.clientX;
-  cStartY = t.clientY;
-  cOrigW = part.width;
-  cOrigH = part.height;
-  cOrigX = part.x;
-  cOrigY = part.y;
-  cDir = dir;
-  cPart = part;
-  window.addEventListener("mousemove", doCornerResize);
-  window.addEventListener("touchmove", doCornerResize, { passive: false });
-  window.addEventListener("mouseup", stopCornerResize);
-  window.addEventListener("touchend", stopCornerResize);
-}
-function doCornerResize(e) {
-  if (!cResizing) return;
-  const t = e.touches ? e.touches[0] : e;
-  const dx = t.clientX - cStartX;
-  const dy = t.clientY - cStartY;
-  let newW = cOrigW + (cDir.includes("r") ? dx : -dx);
-  let newH = cOrigH + (cDir.includes("b") ? dy : -dy);
-  newW = Math.max(30, newW);
-  newH = Math.max(30, newH);
-  cPart.width = newW;
-  cPart.height = newH;
-  cPart.x = cDir.includes("l") ? cOrigX + cOrigW - newW : cOrigX;
-  cPart.y = cDir.includes("t") ? cOrigY + cOrigH - newH : cOrigY;
-
-  const scale = newH / cOrigH;
-  if (cPart.symVertices) {
-    cPart.symVertices.forEach((v) => {
-      v.y *= scale;
-    });
-  }
-  updatePartWidth(cPart);
-  updateCornerHandles(cPart);
-
-  const idx = parts.indexOf(cPart);
-  let baseY = cPart.y + newH;
-  for (let i = idx + 1; i < parts.length; i++) {
-    parts[i].y = baseY;
-    parts[i].rect.setAttribute("y", baseY);
-    parts[i].handle.setAttribute("y", baseY + parts[i].height - 5);
-    parts[i].leftHandle.setAttribute("y", baseY + parts[i].height / 2 - 5);
-    parts[i].rightHandle.setAttribute("y", baseY + parts[i].height / 2 - 5);
-    parts[i].topLabel.setAttribute("y", baseY - 6);
-    parts[i].bottomLabel.setAttribute("y", baseY + parts[i].height + 6);
-    if (parts[i].specialIcon) {
-      parts[i].specialIcon.setAttribute("y", baseY + parts[i].height / 2 - 7);
-    }
-    baseY += parts[i].height;
-  }
-}
-function stopCornerResize() {
-  cResizing = false;
-  window.removeEventListener("mousemove", doCornerResize);
-  window.removeEventListener("touchmove", doCornerResize);
-  window.removeEventListener("mouseup", stopCornerResize);
-  window.removeEventListener("touchend", stopCornerResize);
-  updateCanvasSize();
-}
-
 function updatePartWidth(part) {
   part.rect.setAttribute("x", part.x);
   part.rect.setAttribute("width", part.width);
@@ -1245,7 +1081,6 @@ function updatePartWidth(part) {
   }
   updatePolygonShape(part);
   updateVertexHandles(part);
-  updateCornerHandles(part);
 }
 
 // -- Dimension Helpers --
@@ -1305,7 +1140,6 @@ function updatePartHeight(part, newH) {
   }
   updatePolygonShape(part);
   updateVertexHandles(part);
-  updateCornerHandles(part);
   const idx = parts.indexOf(part);
   let baseY = part.y + newH;
   for (let i = idx + 1; i < parts.length; i++) {
@@ -1356,27 +1190,11 @@ function updateVertexHandles(part) {
   });
 }
 
-function updateCornerHandles(part) {
-  if (!part.cornerHandles) return;
-  const [tl, tr, bl, br] = part.cornerHandles;
-  tl.setAttribute("x", part.x - 4);
-  tl.setAttribute("y", part.y - 4);
-  tr.setAttribute("x", part.x + part.width - 4);
-  tr.setAttribute("y", part.y - 4);
-  bl.setAttribute("x", part.x - 4);
-  bl.setAttribute("y", part.y + part.height - 4);
-  br.setAttribute("x", part.x + part.width - 4);
-  br.setAttribute("y", part.y + part.height - 4);
-}
-
 function toggleHandles(part, show) {
   const display = show ? "block" : "none";
   part.handle.style.display = display;
   part.leftHandle.style.display = display;
   part.rightHandle.style.display = display;
-  if (part.cornerHandles) {
-    part.cornerHandles.forEach((h) => (h.style.display = display));
-  }
   if (part.vertexHandles) {
     part.vertexHandles.forEach((h) => (h.style.display = display));
   }
