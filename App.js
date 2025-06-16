@@ -48,6 +48,8 @@ function updateCanvasSize() {
   const newW = Math.max(canvasArea.clientWidth, right + 40);
   canvas.style.height = `${newH}px`;
   canvas.style.width = `${newW}px`;
+  canvas.setAttribute('height', newH);
+  canvas.setAttribute('width', newW);
   centerDiagram();
   updateAxes();
 }
