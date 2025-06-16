@@ -42,6 +42,7 @@ document.getElementById("version").textContent = APP_VERSION;
 document.getElementById("lastUpdated").textContent = new Date(document.lastModified).toLocaleString();
 
 function updateCanvasSize() {
+  const prevScrollTop = canvasArea.scrollTop;
   const bottom = parts.reduce((m, p) => Math.max(m, p.y + p.height), 0);
   const right = parts.reduce((m, p) => Math.max(m, p.x + p.width), 0);
   const newH = Math.max(canvasArea.clientHeight, bottom + 40);
@@ -52,6 +53,7 @@ function updateCanvasSize() {
   canvas.setAttribute('width', newW);
   centerDiagram();
   updateAxes();
+  canvasArea.scrollTop = prevScrollTop;
 }
 
 function centerDiagram() {
