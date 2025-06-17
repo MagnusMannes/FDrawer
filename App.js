@@ -32,6 +32,25 @@ let snapEnabled = false;
 let snapIndicator = null;
 let shapeStrokeWidth = 2;
 
+const CONNECTOR_TEMPLATE = {
+  width: 496,
+  height: 432,
+  lines: [
+    { relX1: 0.002976190476190476, relY1: 0.05092592592592593, relX2: 0.9871031746031746, relY2: 0.1527777777777778 },
+    { relX1: 0.008928571428571428, relY1: 0.1388888888888889, relX2: 0.9811507936507936, relY2: 0.25000000000000006 },
+    { relX1: 0.01488095238095238, relY1: 0.2268518518518519, relX2: 0.9712301587301587, relY2: 0.3518518518518519 },
+    { relX1: 0.022817460317460316, relY1: 0.3148148148148149, relX2: 0.9672619047619048, relY2: 0.4467592592592593 },
+    { relX1: 0.9950396825396826, relY1: 0.06712962962962964, relX2: 0.4236111111111111, relY2: 0.002314814814814815 },
+    { relX1: 0.028769841269841268, relY1: 0.38888888888888895, relX2: 0.9613095238095238, relY2: 0.5300925925925927 },
+    { relX1: 0.034722222222222224, relY1: 0.47222222222222227, relX2: 0.9533730158730159, relY2: 0.6226851851851852 },
+    { relX1: 0.040674603174603176, relY1: 0.5625000000000001, relX2: 0.9474206349206349, relY2: 0.7199074074074076 },
+    { relX1: 0.04662698412698413, relY1: 0.650462962962963, relX2: 0.933531746031746, relY2: 0.826388888888889 },
+    { relX1: 0.054563492063492064, relY1: 0.7453703703703705, relX2: 0.9315476190476191, relY2: 0.9212962962962964 },
+    { relX1: 0.060515873015873016, relY1: 0.8310185185185186, relX2: 0.8779761904761905, relY2: 0.9953703703703705 },
+    { relX1: 0.06845238095238096, relY1: 0.9120370370370372, relX2: 0.5208333333333334, relY2: 1.0000000000000002 },
+  ],
+};
+
 snapIndicator = document.createElementNS(svgNS, 'circle');
 snapIndicator.setAttribute('r', 4);
 snapIndicator.setAttribute('fill', 'none');
@@ -782,6 +801,10 @@ function createPartFromData(p) {
   updateVertexHandles(partData);
   addPartEventListeners(partData);
   toggleHandles(partData, false);
+  if (partData.topConnector && partData.topConnector !== 'none')
+    createConnector(partData, 'top', partData.topConnector);
+  if (partData.bottomConnector && partData.bottomConnector !== 'none')
+    createConnector(partData, 'bottom', partData.bottomConnector);
   updateCanvasSize();
   return partData;
 }
@@ -820,6 +843,12 @@ function applyShapeToPart(part, data) {
   updateConnectorLabelClass(part.topLabel, part.topConnector);
   part.bottomLabel.textContent = labelFor(part.bottomConnector);
   updateConnectorLabelClass(part.bottomLabel, part.bottomConnector);
+  if (part.topConnector && part.topConnector !== 'none')
+    createConnector(part, 'top', part.topConnector);
+  else removeConnector(part, 'top');
+  if (part.bottomConnector && part.bottomConnector !== 'none')
+    createConnector(part, 'bottom', part.bottomConnector);
+  else removeConnector(part, 'bottom');
 
   part.special = data.special;
   if (part.special) {
@@ -987,10 +1016,14 @@ function handleConnectorToggle(evt, part) {
     part.topConnector = nextState(part.topConnector);
     part.topLabel.textContent = labelFor(part.topConnector);
     updateConnectorLabelClass(part.topLabel, part.topConnector);
+    if (part.topConnector === 'none') removeConnector(part, 'top');
+    else createConnector(part, 'top', part.topConnector);
   } else if (y > rectY + h - 10) {
     part.bottomConnector = nextState(part.bottomConnector);
     part.bottomLabel.textContent = labelFor(part.bottomConnector);
     updateConnectorLabelClass(part.bottomLabel, part.bottomConnector);
+    if (part.bottomConnector === 'none') removeConnector(part, 'bottom');
+    else createConnector(part, 'bottom', part.bottomConnector);
   }
 }
 function nextState(s) {
@@ -1189,6 +1222,7 @@ function doResize(e) {
   updatePolygonShape(resizePart);
   updateVertexHandles(resizePart);
   updateAttachedShapes(resizePart);
+  updateConnectors(resizePart);
 
   const idx = parts.indexOf(resizePart);
   let baseY = resizePart.y + newH;
@@ -1204,6 +1238,7 @@ function doResize(e) {
       parts[i].specialIcon.setAttribute("y", baseY + parts[i].height / 2 - 7);
     }
     updateAttachedShapes(parts[i]);
+    updateConnectors(parts[i]);
     baseY += parts[i].height;
   }
 }
@@ -1272,6 +1307,7 @@ function updatePartWidth(part) {
   updatePolygonShape(part);
   updateVertexHandles(part);
   updateAttachedShapes(part);
+  updateConnectors(part);
 }
 
 // -- Dimension Helpers --
@@ -1354,6 +1390,7 @@ function applyNewWidth(part, newW) {
   part.x = center - newW / 2;
   updatePartWidth(part);
   updateAttachedShapes(part);
+  updateConnectors(part);
   updateCanvasSize();
 }
 
@@ -1381,6 +1418,7 @@ function updatePartHeight(part, newH) {
   updatePolygonShape(part);
   updateVertexHandles(part);
   updateAttachedShapes(part);
+  updateConnectors(part);
   const idx = parts.indexOf(part);
   let baseY = part.y + newH;
   for (let i = idx + 1; i < parts.length; i++) {
@@ -1395,6 +1433,7 @@ function updatePartHeight(part, newH) {
       parts[i].specialIcon.setAttribute('y', baseY + parts[i].height / 2 - 7);
     }
     updateAttachedShapes(parts[i]);
+    updateConnectors(parts[i]);
     baseY += parts[i].height;
   }
   updateCanvasSize();
@@ -1576,12 +1615,70 @@ function detachShapeFromPart(shape) {
   delete shape.relP2;
 }
 
+function removeConnector(part, pos) {
+  if (!part.connectors || !part.connectors[pos]) return;
+  const c = part.connectors[pos];
+  if (c.group) c.group.remove();
+  delete part.connectors[pos];
+}
+
+function createConnector(part, pos, type) {
+  if (!part.connectors) part.connectors = {};
+  removeConnector(part, pos);
+
+  const w = part.width * 0.9;
+  const h = (CONNECTOR_TEMPLATE.height / CONNECTOR_TEMPLATE.width) * w;
+  const flip = (pos === 'top' && type === 'PIN') || (pos === 'bottom' && type === 'BOX');
+  const x0 = part.x + (part.width - w) / 2;
+  let y0;
+  if (pos === 'top') y0 = type === 'PIN' ? part.y - h : part.y;
+  else y0 = type === 'PIN' ? part.y + part.height : part.y + part.height - h;
+
+  const g = document.createElementNS(svgNS, 'g');
+  g.classList.add('connector-shape');
+
+  const rect = document.createElementNS(svgNS, 'rect');
+  rect.setAttribute('x', x0);
+  rect.setAttribute('y', y0);
+  rect.setAttribute('width', w);
+  rect.setAttribute('height', h);
+  rect.setAttribute('fill', '#cccccc');
+  if (type === 'BOX') rect.setAttribute('fill-opacity', '0.8');
+  g.appendChild(rect);
+
+  CONNECTOR_TEMPLATE.lines.forEach((t) => {
+    const line = document.createElementNS(svgNS, 'line');
+    const y1 = flip ? 1 - t.relY1 : t.relY1;
+    const y2 = flip ? 1 - t.relY2 : t.relY2;
+    line.setAttribute('x1', x0 + t.relX1 * w);
+    line.setAttribute('y1', y0 + y1 * h);
+    line.setAttribute('x2', x0 + t.relX2 * w);
+    line.setAttribute('y2', y0 + y2 * h);
+    line.setAttribute('stroke', 'black');
+    line.setAttribute('stroke-width', 2);
+    g.appendChild(line);
+  });
+
+  drawLayer.appendChild(g);
+  part.connectors[pos] = { type, group: g };
+}
+
+function updateConnectors(part) {
+  if (!part.connectors) return;
+  if (part.connectors.top) createConnector(part, 'top', part.connectors.top.type);
+  if (part.connectors.bottom) createConnector(part, 'bottom', part.connectors.bottom.type);
+}
+
 function removePart(part) {
   saveState();
   const idx = parts.indexOf(part);
   if (idx === -1) return;
   if (part.shapes) {
     part.shapes.forEach((s) => detachShapeFromPart(s));
+  }
+  if (part.connectors) {
+    removeConnector(part, 'top');
+    removeConnector(part, 'bottom');
   }
   canvas.removeChild(part.g);
   parts.splice(idx, 1);
@@ -1609,6 +1706,7 @@ function removePart(part) {
     updatePolygonShape(p);
     updateVertexHandles(p);
     updateAttachedShapes(p);
+    updateConnectors(p);
     baseY += p.height;
   }
   updateCanvasSize();
