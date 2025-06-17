@@ -14,6 +14,7 @@ const parts = [];
 const drawnShapes = [];
 let tempShape = null;
 let selectedPart = null;
+let selectedShape = null;
 let copiedColor = null;
 let copiedShape = null;
 let contextPart = null;
@@ -87,6 +88,7 @@ function setDrawMode(mode) {
     tempShape.remove();
     tempShape = null;
   }
+  if (mode) clearSelectedShape();
   document.querySelectorAll('.draw-tool').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.mode === mode);
   });
@@ -200,6 +202,11 @@ function handleCanvasClick(e) {
 
 canvas.addEventListener('click', handleCanvasClick, true);
 canvas.addEventListener('mousemove', handleMouseMove, true);
+canvas.addEventListener('mousedown', (e) => {
+  if (!drawMode && !e.target.closest('.drawn-shape')) {
+    clearSelectedShape();
+  }
+});
 
 function handleMouseMove(e) {
   const { x, y } = getSnappedPosition(e.offsetX, e.offsetY);
@@ -1485,8 +1492,79 @@ function createDrawnShapeFromData(s) {
   return null;
 }
 
+function createHandle(x, y) {
+  const h = document.createElementNS(svgNS, 'rect');
+  h.setAttribute('width', 8);
+  h.setAttribute('height', 8);
+  h.setAttribute('x', x - 4);
+  h.setAttribute('y', y - 4);
+  h.classList.add('shape-handle');
+  drawLayer.appendChild(h);
+  return h;
+}
+
+function updateShapeHandles(shape) {
+  if (!shape.handles) return;
+  const setPos = (h, x, y) => {
+    h.setAttribute('x', x - 4);
+    h.setAttribute('y', y - 4);
+  };
+  if (shape.type === 'line') {
+    setPos(shape.handles[0], shape.x1, shape.y1);
+    setPos(shape.handles[1], shape.x2, shape.y2);
+  } else if (shape.type === 'circle') {
+    setPos(shape.handles[0], shape.cx, shape.cy);
+    setPos(shape.handles[1], shape.cx + shape.r, shape.cy);
+  } else if (shape.type === 'curve') {
+    setPos(shape.handles[0], shape.p0.x, shape.p0.y);
+    setPos(shape.handles[1], shape.p1.x, shape.p1.y);
+    setPos(shape.handles[2], shape.p2.x, shape.p2.y);
+  }
+}
+
+function selectShape(shape) {
+  if (selectedShape === shape) return;
+  clearSelectedShape();
+  selectedShape = shape;
+  shape.elem.classList.add('selected');
+  if (!shape.handles) {
+    if (shape.type === 'line') {
+      shape.handles = [
+        createHandle(shape.x1, shape.y1),
+        createHandle(shape.x2, shape.y2),
+      ];
+    } else if (shape.type === 'circle') {
+      shape.handles = [
+        createHandle(shape.cx, shape.cy),
+        createHandle(shape.cx + shape.r, shape.cy),
+      ];
+    } else if (shape.type === 'curve') {
+      shape.handles = [
+        createHandle(shape.p0.x, shape.p0.y),
+        createHandle(shape.p1.x, shape.p1.y),
+        createHandle(shape.p2.x, shape.p2.y),
+      ];
+    }
+  }
+  updateShapeHandles(shape);
+}
+
+function clearSelectedShape() {
+  if (!selectedShape) return;
+  selectedShape.elem.classList.remove('selected');
+  if (selectedShape.handles) {
+    selectedShape.handles.forEach((h) => h.remove());
+    selectedShape.handles = null;
+  }
+  selectedShape = null;
+}
+
 function addShapeEventListeners(shape) {
-  shape.elem.addEventListener('mousedown', (e) => startShapeDrag(e, shape));
+  shape.elem.addEventListener('mousedown', (e) => {
+    selectShape(shape);
+    startShapeDrag(e, shape);
+  });
+  shape.elem.addEventListener('click', () => selectShape(shape));
   shape.elem.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     removeShape(shape);
@@ -1539,6 +1617,7 @@ function doShapeDrag(e) {
     shape.elem.setAttribute('y1', shape.y1);
     shape.elem.setAttribute('x2', shape.x2);
     shape.elem.setAttribute('y2', shape.y2);
+    updateShapeHandles(shape);
   } else if (shape.type === 'circle') {
     if (mode === 'move') {
       shape.cx = start.cx + dx;
@@ -1552,6 +1631,7 @@ function doShapeDrag(e) {
     shape.elem.setAttribute('cx', shape.cx);
     shape.elem.setAttribute('cy', shape.cy);
     shape.elem.setAttribute('r', shape.r);
+    updateShapeHandles(shape);
   }
 }
 
@@ -1565,6 +1645,7 @@ function removeShape(shape) {
   const idx = drawnShapes.indexOf(shape);
   if (idx !== -1) drawnShapes.splice(idx, 1);
   if (shape.elem) shape.elem.remove();
+  if (selectedShape === shape) clearSelectedShape();
   saveState();
 }
 
