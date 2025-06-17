@@ -28,6 +28,7 @@ let curvePoints = [];
 let circleCenter = null;
 let snapEnabled = false;
 let snapIndicator = null;
+let shapeStrokeWidth = 2;
 
 snapIndicator = document.createElementNS(svgNS, 'circle');
 snapIndicator.setAttribute('r', 4);
@@ -91,9 +92,19 @@ function setDrawMode(mode) {
   });
 }
 
-document.getElementById('drawLine').addEventListener('click', () => setDrawMode('line'));
+const drawLineBtn = document.getElementById('drawLine');
+const drawCircleBtn = document.getElementById('drawCircle');
 document.getElementById('drawCurve').addEventListener('click', () => setDrawMode('curve'));
-document.getElementById('drawCircle').addEventListener('click', () => setDrawMode('circle'));
+drawLineBtn.addEventListener('click', () => setDrawMode('line'));
+drawCircleBtn.addEventListener('click', () => setDrawMode('circle'));
+drawLineBtn.addEventListener('dblclick', () => {
+  const val = parseFloat(prompt('Enter line width (px):', shapeStrokeWidth));
+  if (!isNaN(val) && val > 0) shapeStrokeWidth = val;
+});
+drawCircleBtn.addEventListener('dblclick', () => {
+  const val = parseFloat(prompt('Enter line width (px):', shapeStrokeWidth));
+  if (!isNaN(val) && val > 0) shapeStrokeWidth = val;
+});
 document.getElementById('zoomIn').addEventListener('click', () => {
   zoom = Math.min(3, zoom + 0.1);
   updateZoom();
@@ -122,13 +133,16 @@ function handleCanvasClick(e) {
       tempShape.setAttribute('y1', y);
       tempShape.setAttribute('x2', x);
       tempShape.setAttribute('y2', y);
+      tempShape.setAttribute('stroke-width', shapeStrokeWidth);
       tempShape.classList.add('drawn-shape', 'preview-shape');
       drawLayer.appendChild(tempShape);
     } else {
       tempShape.setAttribute('x2', x);
       tempShape.setAttribute('y2', y);
       tempShape.classList.remove('preview-shape');
-      drawnShapes.push({ type: 'line', x1: lineStart.x, y1: lineStart.y, x2: x, y2: y });
+      const obj = { type: 'line', x1: lineStart.x, y1: lineStart.y, x2: x, y2: y, width: shapeStrokeWidth, elem: tempShape };
+      drawnShapes.push(obj);
+      addShapeEventListeners(obj);
       saveState();
       tempShape = null;
       setDrawMode(null);
@@ -143,12 +157,17 @@ function handleCanvasClick(e) {
       const d = `M ${curvePoints[0].x} ${curvePoints[0].y} Q ${curvePoints[1].x} ${curvePoints[1].y} ${curvePoints[2].x} ${curvePoints[2].y}`;
       tempShape.setAttribute('d', d);
       tempShape.classList.remove('preview-shape');
-      drawnShapes.push({
+      const obj = {
         type: 'curve',
         p0: curvePoints[0],
         p1: curvePoints[1],
         p2: curvePoints[2],
-      });
+        width: shapeStrokeWidth,
+        elem: tempShape,
+      };
+      tempShape.setAttribute('stroke-width', shapeStrokeWidth);
+      drawnShapes.push(obj);
+      addShapeEventListeners(obj);
       saveState();
       tempShape = null;
       setDrawMode(null);
@@ -160,6 +179,7 @@ function handleCanvasClick(e) {
       tempShape.setAttribute('cx', x);
       tempShape.setAttribute('cy', y);
       tempShape.setAttribute('r', 0);
+      tempShape.setAttribute('stroke-width', shapeStrokeWidth);
       tempShape.classList.add('drawn-shape', 'preview-shape');
       drawLayer.appendChild(tempShape);
     } else {
@@ -168,7 +188,9 @@ function handleCanvasClick(e) {
       const r = Math.sqrt(dx * dx + dy * dy);
       tempShape.setAttribute('r', r);
       tempShape.classList.remove('preview-shape');
-      drawnShapes.push({ type: 'circle', cx: circleCenter.x, cy: circleCenter.y, r });
+      const obj = { type: 'circle', cx: circleCenter.x, cy: circleCenter.y, r, width: shapeStrokeWidth, elem: tempShape };
+      drawnShapes.push(obj);
+      addShapeEventListeners(obj);
       saveState();
       tempShape = null;
       setDrawMode(null);
@@ -253,7 +275,7 @@ function getSnappedPosition(x, y, showIndicator = true) {
 function saveState() {
   const state = JSON.stringify({
     parts: parts.map((p) => exportPart(p)),
-    drawnShapes,
+    drawnShapes: drawnShapes.map(stripShape),
   });
   undoStack.push(state);
   if (undoStack.length > 15) undoStack.shift();
@@ -404,7 +426,7 @@ document.getElementById("exportBtn").addEventListener("click", () => {
       })),
       symVertices: (p.symVertices || []).map((v) => ({ y: v.y, dx: v.dx })),
     })),
-    drawnShapes,
+    drawnShapes: drawnShapes.map(stripShape),
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], {
     type: "application/json",
@@ -1239,6 +1261,18 @@ function parseDimension(input, defUnit) {
   return unit === 'in' ? val * PX_PER_INCH : val * PX_PER_CM;
 }
 
+function stripShape(s) {
+  const base = { type: s.type, width: s.width };
+  if (s.type === 'line') {
+    return { ...base, x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2 };
+  } else if (s.type === 'curve') {
+    return { ...base, p0: s.p0, p1: s.p1, p2: s.p2 };
+  } else if (s.type === 'circle') {
+    return { ...base, cx: s.cx, cy: s.cy, r: s.r };
+  }
+  return base;
+}
+
 function applyNewWidth(part, newW) {
   saveState();
   const center = part.x + part.width / 2;
@@ -1442,8 +1476,96 @@ function createDrawnShapeFromData(s) {
   }
   if (elem) {
     elem.classList.add('drawn-shape');
+    elem.setAttribute('stroke-width', s.width || shapeStrokeWidth);
     drawLayer.appendChild(elem);
+    const obj = { ...s, width: s.width || shapeStrokeWidth, elem };
+    addShapeEventListeners(obj);
+    return obj;
   }
+  return null;
+}
+
+function addShapeEventListeners(shape) {
+  shape.elem.addEventListener('mousedown', (e) => startShapeDrag(e, shape));
+  shape.elem.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    removeShape(shape);
+  });
+}
+
+let shapeDrag = null;
+function startShapeDrag(e, shape) {
+  e.preventDefault();
+  saveState();
+  const rect = canvas.getBoundingClientRect();
+  const x = (e.clientX - rect.left) / zoom;
+  const y = (e.clientY - rect.top) / zoom;
+  let mode = 'move';
+  if (shape.type === 'line') {
+    const d1 = Math.hypot(x - shape.x1, y - shape.y1);
+    const d2 = Math.hypot(x - shape.x2, y - shape.y2);
+    if (d1 < 6) mode = 'start';
+    else if (d2 < 6) mode = 'end';
+  } else if (shape.type === 'circle') {
+    const d = Math.hypot(x - shape.cx, y - shape.cy);
+    if (Math.abs(d - shape.r) < 6) mode = 'resize';
+  }
+  shapeDrag = {
+    shape,
+    mode,
+    startX: e.clientX,
+    startY: e.clientY,
+    start: { ...shape },
+  };
+  window.addEventListener('mousemove', doShapeDrag);
+  window.addEventListener('mouseup', stopShapeDrag);
+}
+
+function doShapeDrag(e) {
+  if (!shapeDrag) return;
+  const { shape, mode, startX, startY, start } = shapeDrag;
+  const dx = (e.clientX - startX) / zoom;
+  const dy = (e.clientY - startY) / zoom;
+  if (shape.type === 'line') {
+    if (mode === 'start' || mode === 'move') {
+      shape.x1 = start.x1 + dx;
+      shape.y1 = start.y1 + dy;
+    }
+    if (mode === 'end' || mode === 'move') {
+      shape.x2 = start.x2 + dx;
+      shape.y2 = start.y2 + dy;
+    }
+    shape.elem.setAttribute('x1', shape.x1);
+    shape.elem.setAttribute('y1', shape.y1);
+    shape.elem.setAttribute('x2', shape.x2);
+    shape.elem.setAttribute('y2', shape.y2);
+  } else if (shape.type === 'circle') {
+    if (mode === 'move') {
+      shape.cx = start.cx + dx;
+      shape.cy = start.cy + dy;
+    } else if (mode === 'resize') {
+      const rect = canvas.getBoundingClientRect();
+      const rx = (e.clientX - rect.left) / zoom;
+      const ry = (e.clientY - rect.top) / zoom;
+      shape.r = Math.max(1, Math.hypot(rx - start.cx, ry - start.cy));
+    }
+    shape.elem.setAttribute('cx', shape.cx);
+    shape.elem.setAttribute('cy', shape.cy);
+    shape.elem.setAttribute('r', shape.r);
+  }
+}
+
+function stopShapeDrag() {
+  window.removeEventListener('mousemove', doShapeDrag);
+  window.removeEventListener('mouseup', stopShapeDrag);
+  shapeDrag = null;
+}
+
+function removeShape(shape) {
+  const idx = drawnShapes.indexOf(shape);
+  if (idx !== -1) drawnShapes.splice(idx, 1);
+  if (shape.elem) shape.elem.remove();
+  saveState();
 }
 
 function updateAxes() {
@@ -1542,9 +1664,9 @@ function loadFromData(data) {
   }
   if (data.drawnShapes) {
     data.drawnShapes.forEach((s) => {
-      createDrawnShapeFromData(s);
+      const obj = createDrawnShapeFromData(s);
+      if (obj) drawnShapes.push(obj);
     });
-    drawnShapes.push(...data.drawnShapes);
   }
   updateCanvasSize();
 }
