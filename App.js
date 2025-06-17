@@ -2,7 +2,7 @@ const svgNS = "http://www.w3.org/2000/svg";
 const canvas = document.getElementById("diagramCanvas");
 canvas.addEventListener("contextmenu", (e) => {
   e.preventDefault();
-  showContextMenu(e, null);
+  showContextMenu(e);
 });
 const drawLayer = document.createElementNS(svgNS, "g");
 canvas.appendChild(drawLayer);
@@ -18,6 +18,7 @@ let selectedShape = null;
 let copiedColor = null;
 let copiedShape = null;
 let contextPart = null;
+let contextShape = null;
 const menu = document.getElementById("contextMenu");
 const canvasArea = document.getElementById("canvas_area");
 let zoom = 1;
@@ -321,6 +322,7 @@ document.getElementById("pasteColor").addEventListener("click", () => {
 document.getElementById("removeBody").addEventListener("click", () => {
   if (contextPart) removePart(contextPart);
   contextPart = null;
+  contextShape = null;
   menu.style.display = "none";
 });
 
@@ -328,6 +330,7 @@ document.getElementById("undoAction").addEventListener("click", () => {
   undo();
   menu.style.display = "none";
   contextPart = null;
+  contextShape = null;
 });
 
 document.getElementById("copyColorMenu").addEventListener("click", () => {
@@ -343,11 +346,15 @@ document.getElementById("pasteColorMenu").addEventListener("click", () => {
     document.getElementById("colorPicker").value = copiedColor;
   }
   menu.style.display = "none";
+  contextPart = null;
+  contextShape = null;
 });
 
 document.getElementById("copyShapeMenu").addEventListener("click", () => {
   if (contextPart) copiedShape = exportPart(contextPart);
   menu.style.display = "none";
+  contextPart = null;
+  contextShape = null;
 });
 
 document.getElementById("pasteShapeMenu").addEventListener("click", () => {
@@ -367,6 +374,33 @@ document.getElementById("pasteShapeMenu").addEventListener("click", () => {
     createPartFromData(data);
   }
   menu.style.display = "none";
+  contextPart = null;
+  contextShape = null;
+});
+
+document.getElementById("attachShapeMenu").addEventListener("click", () => {
+  if (contextShape && selectedPart) {
+    attachShapeToPart(contextShape, selectedPart);
+    updateAttachedShapes(selectedPart);
+  }
+  menu.style.display = "none";
+  contextShape = null;
+  contextPart = null;
+});
+
+document.getElementById("detachShapeMenu").addEventListener("click", () => {
+  if (contextShape) {
+    detachShapeFromPart(contextShape);
+  }
+  menu.style.display = "none";
+  contextShape = null;
+  contextPart = null;
+});
+
+document.getElementById("deleteShapeMenu").addEventListener("click", () => {
+  if (contextShape) removeShape(contextShape);
+  menu.style.display = "none";
+  contextShape = null;
   contextPart = null;
 });
 
@@ -409,6 +443,7 @@ document.getElementById("resetView").addEventListener("click", () => {
 document.addEventListener("click", () => {
   menu.style.display = "none";
   contextPart = null;
+  contextShape = null;
 });
 
 document.getElementById("exportBtn").addEventListener("click", () => {
@@ -1153,6 +1188,7 @@ function doResize(e) {
   }
   updatePolygonShape(resizePart);
   updateVertexHandles(resizePart);
+  updateAttachedShapes(resizePart);
 
   const idx = parts.indexOf(resizePart);
   let baseY = resizePart.y + newH;
@@ -1167,6 +1203,7 @@ function doResize(e) {
     if (parts[i].specialIcon) {
       parts[i].specialIcon.setAttribute("y", baseY + parts[i].height / 2 - 7);
     }
+    updateAttachedShapes(parts[i]);
     baseY += parts[i].height;
   }
 }
@@ -1234,6 +1271,7 @@ function updatePartWidth(part) {
   }
   updatePolygonShape(part);
   updateVertexHandles(part);
+  updateAttachedShapes(part);
 }
 
 // -- Dimension Helpers --
@@ -1270,12 +1308,41 @@ function parseDimension(input, defUnit) {
 
 function stripShape(s) {
   const base = { type: s.type, width: s.width };
+  if (s.parentPart) {
+    base.parentIndex = parts.indexOf(s.parentPart);
+  }
   if (s.type === 'line') {
-    return { ...base, x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2 };
+    return {
+      ...base,
+      x1: s.x1,
+      y1: s.y1,
+      x2: s.x2,
+      y2: s.y2,
+      relX1: s.relX1,
+      relY1: s.relY1,
+      relX2: s.relX2,
+      relY2: s.relY2,
+    };
   } else if (s.type === 'curve') {
-    return { ...base, p0: s.p0, p1: s.p1, p2: s.p2 };
+    return {
+      ...base,
+      p0: s.p0,
+      p1: s.p1,
+      p2: s.p2,
+      relP0: s.relP0,
+      relP1: s.relP1,
+      relP2: s.relP2,
+    };
   } else if (s.type === 'circle') {
-    return { ...base, cx: s.cx, cy: s.cy, r: s.r };
+    return {
+      ...base,
+      cx: s.cx,
+      cy: s.cy,
+      r: s.r,
+      relCX: s.relCX,
+      relCY: s.relCY,
+      relR: s.relR,
+    };
   }
   return base;
 }
@@ -1286,6 +1353,7 @@ function applyNewWidth(part, newW) {
   part.width = newW;
   part.x = center - newW / 2;
   updatePartWidth(part);
+  updateAttachedShapes(part);
   updateCanvasSize();
 }
 
@@ -1312,6 +1380,7 @@ function updatePartHeight(part, newH) {
   }
   updatePolygonShape(part);
   updateVertexHandles(part);
+  updateAttachedShapes(part);
   const idx = parts.indexOf(part);
   let baseY = part.y + newH;
   for (let i = idx + 1; i < parts.length; i++) {
@@ -1325,6 +1394,7 @@ function updatePartHeight(part, newH) {
     if (parts[i].specialIcon) {
       parts[i].specialIcon.setAttribute('y', baseY + parts[i].height / 2 - 7);
     }
+    updateAttachedShapes(parts[i]);
     baseY += parts[i].height;
   }
   updateCanvasSize();
@@ -1414,10 +1484,105 @@ function setVertexWidth(part, vertex) {
   updateVertexHandles(part);
 }
 
+function updateShapeRelative(shape) {
+  if (!shape.parentPart) return;
+  const part = shape.parentPart;
+  if (shape.type === 'line') {
+    shape.relX1 = (shape.x1 - part.x) / part.width;
+    shape.relY1 = (shape.y1 - part.y) / part.height;
+    shape.relX2 = (shape.x2 - part.x) / part.width;
+    shape.relY2 = (shape.y2 - part.y) / part.height;
+  } else if (shape.type === 'circle') {
+    shape.relCX = (shape.cx - part.x) / part.width;
+    shape.relCY = (shape.cy - part.y) / part.height;
+    shape.relR = shape.r / ((part.width + part.height) / 2);
+  } else if (shape.type === 'curve') {
+    shape.relP0 = {
+      x: (shape.p0.x - part.x) / part.width,
+      y: (shape.p0.y - part.y) / part.height,
+    };
+    shape.relP1 = {
+      x: (shape.p1.x - part.x) / part.width,
+      y: (shape.p1.y - part.y) / part.height,
+    };
+    shape.relP2 = {
+      x: (shape.p2.x - part.x) / part.width,
+      y: (shape.p2.y - part.y) / part.height,
+    };
+  }
+}
+
+function updateAttachedShapes(part) {
+  if (!part.shapes) return;
+  part.shapes.forEach((s) => {
+    if (s.type === 'line') {
+      s.x1 = part.x + s.relX1 * part.width;
+      s.y1 = part.y + s.relY1 * part.height;
+      s.x2 = part.x + s.relX2 * part.width;
+      s.y2 = part.y + s.relY2 * part.height;
+      s.elem.setAttribute('x1', s.x1);
+      s.elem.setAttribute('y1', s.y1);
+      s.elem.setAttribute('x2', s.x2);
+      s.elem.setAttribute('y2', s.y2);
+    } else if (s.type === 'circle') {
+      s.cx = part.x + s.relCX * part.width;
+      s.cy = part.y + s.relCY * part.height;
+      s.r = s.relR * ((part.width + part.height) / 2);
+      s.elem.setAttribute('cx', s.cx);
+      s.elem.setAttribute('cy', s.cy);
+      s.elem.setAttribute('r', s.r);
+    } else if (s.type === 'curve') {
+      s.p0.x = part.x + s.relP0.x * part.width;
+      s.p0.y = part.y + s.relP0.y * part.height;
+      s.p1.x = part.x + s.relP1.x * part.width;
+      s.p1.y = part.y + s.relP1.y * part.height;
+      s.p2.x = part.x + s.relP2.x * part.width;
+      s.p2.y = part.y + s.relP2.y * part.height;
+      s.elem.setAttribute(
+        'd',
+        `M ${s.p0.x} ${s.p0.y} Q ${s.p1.x} ${s.p1.y} ${s.p2.x} ${s.p2.y}`
+      );
+    }
+    updateShapeHandles(s);
+  });
+}
+
+function attachShapeToPart(shape, part, relData) {
+  if (!part.shapes) part.shapes = [];
+  if (!part.shapes.includes(shape)) part.shapes.push(shape);
+  shape.parentPart = part;
+  if (relData) {
+    Object.assign(shape, relData);
+  } else {
+    updateShapeRelative(shape);
+  }
+}
+
+function detachShapeFromPart(shape) {
+  if (!shape.parentPart) return;
+  const arr = shape.parentPart.shapes || [];
+  const idx = arr.indexOf(shape);
+  if (idx !== -1) arr.splice(idx, 1);
+  shape.parentPart = null;
+  delete shape.relX1;
+  delete shape.relY1;
+  delete shape.relX2;
+  delete shape.relY2;
+  delete shape.relCX;
+  delete shape.relCY;
+  delete shape.relR;
+  delete shape.relP0;
+  delete shape.relP1;
+  delete shape.relP2;
+}
+
 function removePart(part) {
   saveState();
   const idx = parts.indexOf(part);
   if (idx === -1) return;
+  if (part.shapes) {
+    part.shapes.forEach((s) => detachShapeFromPart(s));
+  }
   canvas.removeChild(part.g);
   parts.splice(idx, 1);
   if (selectedPart === part) selectedPart = null;
@@ -1443,21 +1608,29 @@ function removePart(part) {
     }
     updatePolygonShape(p);
     updateVertexHandles(p);
+    updateAttachedShapes(p);
     baseY += p.height;
   }
   updateCanvasSize();
 }
 
-function showContextMenu(e, part) {
+function showContextMenu(e, part = null, shape = null) {
   e.preventDefault();
   e.stopPropagation();
   contextPart = part;
+  contextShape = shape;
   document.getElementById('copyColorMenu').style.display = part ? 'block' : 'none';
   document.getElementById('pasteColorMenu').style.display = part && copiedColor ? 'block' : 'none';
   document.getElementById('copyShapeMenu').style.display = part ? 'block' : 'none';
-  document.getElementById('pasteShapeMenu').style.display = copiedShape ? 'block' : 'none';
+  document.getElementById('pasteShapeMenu').style.display =
+    part && copiedShape ? 'block' : 'none';
   document.getElementById('setSizeMenu').style.display = part ? 'block' : 'none';
   document.getElementById('removeBody').style.display = part ? 'block' : 'none';
+  document.getElementById('attachShapeMenu').style.display =
+    shape && selectedPart && shape.parentPart !== selectedPart ? 'block' : 'none';
+  document.getElementById('detachShapeMenu').style.display =
+    shape && shape.parentPart ? 'block' : 'none';
+  document.getElementById('deleteShapeMenu').style.display = shape ? 'block' : 'none';
   const rect = canvasArea.getBoundingClientRect();
   menu.style.left = `${e.clientX - rect.left + canvasArea.scrollLeft}px`;
   menu.style.top = `${e.clientY - rect.top + canvasArea.scrollTop}px`;
@@ -1487,6 +1660,21 @@ function createDrawnShapeFromData(s) {
     drawLayer.appendChild(elem);
     const obj = { ...s, width: s.width || shapeStrokeWidth, elem };
     addShapeEventListeners(obj);
+    if (typeof s.parentIndex === 'number' && parts[s.parentIndex]) {
+      attachShapeToPart(obj, parts[s.parentIndex], {
+        relX1: s.relX1,
+        relY1: s.relY1,
+        relX2: s.relX2,
+        relY2: s.relY2,
+        relCX: s.relCX,
+        relCY: s.relCY,
+        relR: s.relR,
+        relP0: s.relP0,
+        relP1: s.relP1,
+        relP2: s.relP2,
+      });
+      updateAttachedShapes(parts[s.parentIndex]);
+    }
     return obj;
   }
   return null;
@@ -1566,8 +1754,7 @@ function addShapeEventListeners(shape) {
   });
   shape.elem.addEventListener('click', () => selectShape(shape));
   shape.elem.addEventListener('contextmenu', (e) => {
-    e.preventDefault();
-    removeShape(shape);
+    showContextMenu(e, null, shape);
   });
 }
 
@@ -1638,10 +1825,14 @@ function doShapeDrag(e) {
 function stopShapeDrag() {
   window.removeEventListener('mousemove', doShapeDrag);
   window.removeEventListener('mouseup', stopShapeDrag);
+  if (shapeDrag && shapeDrag.shape.parentPart) {
+    updateShapeRelative(shapeDrag.shape);
+  }
   shapeDrag = null;
 }
 
 function removeShape(shape) {
+  if (shape.parentPart) detachShapeFromPart(shape);
   const idx = drawnShapes.indexOf(shape);
   if (idx !== -1) drawnShapes.splice(idx, 1);
   if (shape.elem) shape.elem.remove();
