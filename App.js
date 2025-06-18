@@ -35,7 +35,6 @@ let shapeStrokeWidth = 2;
 const CONNECTOR_TEMPLATE = {
   width: 432,
   height: 372,
-  topInset: 36,
   lines: [
     { relX1: -0.00328808922558913, relY1: -0.003148066902194428, relX2: 1.0733901515151516, relY2: 0.1003465567537196 },
     { relX1: -0.07841435185185185, relY1: 0.08241522733045466, relX2: 1.0648148148148149, relY2: 0.196998560663788 },
@@ -1625,10 +1624,10 @@ function createConnector(part, pos, type) {
   if (!part.connectors) part.connectors = {};
   removeConnector(part, pos);
 
-  const w = part.width;
+  const w = part.width * 0.9;
   const h = (CONNECTOR_TEMPLATE.height / CONNECTOR_TEMPLATE.width) * w;
-  const flip = pos === 'bottom';
-  const x0 = part.x;
+  const flip = (pos === 'top' && type === 'PIN') || (pos === 'bottom' && type === 'BOX');
+  const x0 = part.x + (part.width - w) / 2;
   let y0;
   if (pos === 'top') y0 = type === 'PIN' ? part.y - h : part.y;
   else y0 = type === 'PIN' ? part.y + part.height : part.y + part.height - h;
@@ -1636,30 +1635,14 @@ function createConnector(part, pos, type) {
   const g = document.createElementNS(svgNS, 'g');
   g.classList.add('connector-shape');
 
-  const inset = (CONNECTOR_TEMPLATE.topInset / CONNECTOR_TEMPLATE.width) * w;
-  const polygon = document.createElementNS(svgNS, 'polygon');
-  const points = flip
-    ? [
-        [x0, y0 + h],
-        [x0 + w, y0 + h],
-        [x0 + w - inset, y0],
-        [x0 + inset, y0],
-      ]
-    : [
-        [x0 + inset, y0],
-        [x0 + w - inset, y0],
-        [x0 + w, y0 + h],
-        [x0, y0 + h],
-      ];
-  polygon.setAttribute(
-    'points',
-    points
-      .map((p) => `${p[0]},${p[1]}`)
-      .join(' ')
-  );
-  polygon.setAttribute('fill', '#cccccc');
-  if (type === 'BOX') polygon.setAttribute('fill-opacity', '0.8');
-  g.appendChild(polygon);
+  const rect = document.createElementNS(svgNS, 'rect');
+  rect.setAttribute('x', x0);
+  rect.setAttribute('y', y0);
+  rect.setAttribute('width', w);
+  rect.setAttribute('height', h);
+  rect.setAttribute('fill', '#cccccc');
+  if (type === 'BOX') rect.setAttribute('fill-opacity', '0.8');
+  g.appendChild(rect);
 
   CONNECTOR_TEMPLATE.lines.forEach((t) => {
     const line = document.createElementNS(svgNS, 'line');
