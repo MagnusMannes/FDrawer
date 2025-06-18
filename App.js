@@ -1635,28 +1635,14 @@ function createConnector(part, pos, type) {
   const g = document.createElementNS(svgNS, 'g');
   g.classList.add('connector-shape');
 
-  // determine trapezoid points so side walls align with thread lines
-  const lines = CONNECTOR_TEMPLATE.lines.map((t) => ({
-    x1: t.relX1,
-    y1: flip ? 1 - t.relY1 : t.relY1,
-    x2: t.relX2,
-    y2: flip ? 1 - t.relY2 : t.relY2,
-  }));
-  lines.sort((a, b) => (a.y1 + a.y2) / 2 - (b.y1 + b.y2) / 2);
-  const top = lines[0];
-  const bottom = lines[lines.length - 1];
-  const points = [
-    [x0 + top.x1 * w, y0 + top.y1 * h],
-    [x0 + top.x2 * w, y0 + top.y2 * h],
-    [x0 + bottom.x2 * w, y0 + bottom.y2 * h],
-    [x0 + bottom.x1 * w, y0 + bottom.y1 * h],
-  ];
-
-  const poly = document.createElementNS(svgNS, 'polygon');
-  poly.setAttribute('points', points.map((p) => p.join(' ')).join(' '));
-  poly.setAttribute('fill', '#cccccc');
-  if (type === 'BOX') poly.setAttribute('fill-opacity', '0.8');
-  g.appendChild(poly);
+  const rect = document.createElementNS(svgNS, 'rect');
+  rect.setAttribute('x', x0);
+  rect.setAttribute('y', y0);
+  rect.setAttribute('width', w);
+  rect.setAttribute('height', h);
+  rect.setAttribute('fill', '#cccccc');
+  if (type === 'BOX') rect.setAttribute('fill-opacity', '0.8');
+  g.appendChild(rect);
 
   CONNECTOR_TEMPLATE.lines.forEach((t) => {
     const line = document.createElementNS(svgNS, 'line');
