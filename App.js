@@ -49,6 +49,32 @@ const CONNECTOR_TEMPLATE = {
   ],
 };
 
+function getConnectorBounds() {
+  let top = null,
+    bottom = null,
+    minY = Infinity,
+    maxY = -Infinity;
+  CONNECTOR_TEMPLATE.lines.forEach((l) => {
+    const y = (l.relY1 + l.relY2) / 2;
+    if (y < minY) {
+      minY = y;
+      top = l;
+    }
+    if (y > maxY) {
+      maxY = y;
+      bottom = l;
+    }
+  });
+  return {
+    topLeft: Math.min(top.relX1, top.relX2),
+    topRight: Math.max(top.relX1, top.relX2),
+    bottomLeft: Math.min(bottom.relX1, bottom.relX2),
+    bottomRight: Math.max(bottom.relX1, bottom.relX2),
+  };
+}
+
+const CONNECTOR_BOUNDS = getConnectorBounds();
+
 snapIndicator = document.createElementNS(svgNS, 'circle');
 snapIndicator.setAttribute('r', 4);
 snapIndicator.setAttribute('fill', 'none');
@@ -1635,14 +1661,23 @@ function createConnector(part, pos, type) {
   const g = document.createElementNS(svgNS, 'g');
   g.classList.add('connector-shape');
 
-  const rect = document.createElementNS(svgNS, 'rect');
-  rect.setAttribute('x', x0);
-  rect.setAttribute('y', y0);
-  rect.setAttribute('width', w);
-  rect.setAttribute('height', h);
-  rect.setAttribute('fill', '#cccccc');
-  if (type === 'BOX') rect.setAttribute('fill-opacity', '0.8');
-  g.appendChild(rect);
+  const poly = document.createElementNS(svgNS, 'polygon');
+  const pts = [];
+  if (flip) {
+    pts.push(`${x0 + CONNECTOR_BOUNDS.bottomLeft * w},${y0}`);
+    pts.push(`${x0 + CONNECTOR_BOUNDS.bottomRight * w},${y0}`);
+    pts.push(`${x0 + CONNECTOR_BOUNDS.topRight * w},${y0 + h}`);
+    pts.push(`${x0 + CONNECTOR_BOUNDS.topLeft * w},${y0 + h}`);
+  } else {
+    pts.push(`${x0 + CONNECTOR_BOUNDS.topLeft * w},${y0}`);
+    pts.push(`${x0 + CONNECTOR_BOUNDS.topRight * w},${y0}`);
+    pts.push(`${x0 + CONNECTOR_BOUNDS.bottomRight * w},${y0 + h}`);
+    pts.push(`${x0 + CONNECTOR_BOUNDS.bottomLeft * w},${y0 + h}`);
+  }
+  poly.setAttribute('points', pts.join(' '));
+  poly.setAttribute('fill', '#cccccc');
+  if (type === 'BOX') poly.setAttribute('fill-opacity', '0.8');
+  g.appendChild(poly);
 
   CONNECTOR_TEMPLATE.lines.forEach((t) => {
     const line = document.createElementNS(svgNS, 'line');
