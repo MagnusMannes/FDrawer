@@ -1625,10 +1625,10 @@ function createConnector(part, pos, type) {
   if (!part.connectors) part.connectors = {};
   removeConnector(part, pos);
 
-  const w = part.width * 0.9;
+  const w = part.width;
   const h = (CONNECTOR_TEMPLATE.height / CONNECTOR_TEMPLATE.width) * w;
-  const flip = (pos === 'top' && type === 'PIN') || (pos === 'bottom' && type === 'BOX');
-  const x0 = part.x + (part.width - w) / 2;
+  const flip = pos === 'bottom';
+  const x0 = part.x;
   let y0;
   if (pos === 'top') y0 = type === 'PIN' ? part.y - h : part.y;
   else y0 = type === 'PIN' ? part.y + part.height : part.y + part.height - h;
