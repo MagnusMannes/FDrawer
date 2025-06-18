@@ -35,6 +35,7 @@ let shapeStrokeWidth = 2;
 const CONNECTOR_TEMPLATE = {
   width: 432,
   height: 372,
+  topInset: 36,
   lines: [
     { relX1: -0.00328808922558913, relY1: -0.003148066902194428, relX2: 1.0733901515151516, relY2: 0.1003465567537196 },
     { relX1: -0.07841435185185185, relY1: 0.08241522733045466, relX2: 1.0648148148148149, relY2: 0.196998560663788 },
@@ -1635,14 +1636,30 @@ function createConnector(part, pos, type) {
   const g = document.createElementNS(svgNS, 'g');
   g.classList.add('connector-shape');
 
-  const rect = document.createElementNS(svgNS, 'rect');
-  rect.setAttribute('x', x0);
-  rect.setAttribute('y', y0);
-  rect.setAttribute('width', w);
-  rect.setAttribute('height', h);
-  rect.setAttribute('fill', '#cccccc');
-  if (type === 'BOX') rect.setAttribute('fill-opacity', '0.8');
-  g.appendChild(rect);
+  const inset = (CONNECTOR_TEMPLATE.topInset / CONNECTOR_TEMPLATE.width) * w;
+  const polygon = document.createElementNS(svgNS, 'polygon');
+  const points = flip
+    ? [
+        [x0, y0 + h],
+        [x0 + w, y0 + h],
+        [x0 + w - inset, y0],
+        [x0 + inset, y0],
+      ]
+    : [
+        [x0 + inset, y0],
+        [x0 + w - inset, y0],
+        [x0 + w, y0 + h],
+        [x0, y0 + h],
+      ];
+  polygon.setAttribute(
+    'points',
+    points
+      .map((p) => `${p[0]},${p[1]}`)
+      .join(' ')
+  );
+  polygon.setAttribute('fill', '#cccccc');
+  if (type === 'BOX') polygon.setAttribute('fill-opacity', '0.8');
+  g.appendChild(polygon);
 
   CONNECTOR_TEMPLATE.lines.forEach((t) => {
     const line = document.createElementNS(svgNS, 'line');
