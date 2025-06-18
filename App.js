@@ -32,22 +32,14 @@ let snapEnabled = false;
 let snapIndicator = null;
 let shapeStrokeWidth = 2;
 
-const CONNECTOR_TEMPLATE = {
-  width: 432,
-  height: 372,
-  lines: [
-    { relX1: -0.00328808922558913, relY1: -0.003148066902194428, relX2: 1.0733901515151516, relY2: 0.1003465567537196 },
-    { relX1: -0.07841435185185185, relY1: 0.08241522733045466, relX2: 1.0648148148148149, relY2: 0.196998560663788 },
-    { relX1: -0.06586199294532603, relY1: 0.1825496359326052, relX2: 1.05890376984127, relY2: 0.29108458216916444 },
-    { relX1: -0.04861111111111164, relY1: 0.3918910337820676, relX2: 1.041666666666666, relY2: 0.507866456209103 },
-    { relX1: -0.0434165564373901, relY1: 0.49128939527720333, relX2: 1.0336337081128748, relY2: 0.6045766456612279 },
-    { relX1: -0.03352347883597944, relY1: 0.5951360414625592, relX2: 1.0233548280423277, relY2: 0.7219921602541618 },
-    { relX1: -0.023148148148148674, relY1: 0.6969985606637881, relX2: 1.0119047619047612, relY2: 0.8296150481189852 },
-    { relX1: -0.018490961199294935, relY1: 0.7981410337820675, relX2: 1.002783289241622, relY2: 0.9345977670129944 },
-    { relX1: -0.05890376984127033, relY1: 0.2863802810938957, relX2: 1.0480324074074068, relY2: 0.3982754423842183 },
-    { relX1: -0.010921466650633196, relY1: 0.9020836861118167, relX2: 0.8100060626102292, relY2: 0.9984738550826306 },
-  ],
-};
+let CONNECTOR_TEMPLATE = null;
+
+fetch('threads.json')
+  .then((r) => r.json())
+  .then((d) => {
+    CONNECTOR_TEMPLATE = preprocessConnectorTemplate(d);
+  })
+  .catch((e) => console.error('Failed to load threads.json', e));
 
 snapIndicator = document.createElementNS(svgNS, 'circle');
 snapIndicator.setAttribute('r', 4);
@@ -1613,6 +1605,74 @@ function detachShapeFromPart(shape) {
   delete shape.relP2;
 }
 
+function preprocessConnectorTemplate(data) {
+  const parts = [];
+  const lines = [];
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity;
+
+  (data.parts || []).forEach((p) => {
+    minX = Math.min(minX, p.x);
+    minY = Math.min(minY, p.y);
+    maxX = Math.max(maxX, p.x + p.width);
+    maxY = Math.max(maxY, p.y + p.height);
+    parts.push({
+      x: p.x,
+      y: p.y,
+      width: p.width,
+      height: p.height,
+      verts: (p.symVertices || []).slice().sort((a, b) => a.y - b.y),
+    });
+  });
+
+  (data.drawnShapes || []).forEach((s) => {
+    if (s.type === 'line') {
+      minX = Math.min(minX, s.x1, s.x2);
+      maxX = Math.max(maxX, s.x1, s.x2);
+      minY = Math.min(minY, s.y1, s.y2);
+      maxY = Math.max(maxY, s.y1, s.y2);
+      lines.push({ x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2 });
+    }
+  });
+
+  const width = maxX - minX;
+  const height = maxY - minY;
+
+  parts.forEach((p) => {
+    p.x -= minX;
+    p.y -= minY;
+    const x = p.x;
+    const y = p.y;
+    const w = p.width;
+    const h = p.height;
+    const verts = p.verts;
+    const pts = [];
+    pts.push(`${x},${y}`);
+    pts.push(`${x + w},${y}`);
+    verts.forEach((v) => {
+      pts.push(`${x + w + v.dx},${y + v.y}`);
+    });
+    pts.push(`${x + w},${y + h}`);
+    pts.push(`${x},${y + h}`);
+    for (let i = verts.length - 1; i >= 0; i--) {
+      const v = verts[i];
+      pts.push(`${x - v.dx},${y + v.y}`);
+    }
+    p.points = pts.join(' ');
+  });
+
+  lines.forEach((l) => {
+    l.x1 -= minX;
+    l.y1 -= minY;
+    l.x2 -= minX;
+    l.y2 -= minY;
+  });
+
+  return { width, height, parts, lines };
+}
+
 function removeConnector(part, pos) {
   if (!part.connectors || !part.connectors[pos]) return;
   const c = part.connectors[pos];
@@ -1623,10 +1683,13 @@ function removeConnector(part, pos) {
 function createConnector(part, pos, type) {
   if (!part.connectors) part.connectors = {};
   removeConnector(part, pos);
+  if (!CONNECTOR_TEMPLATE) return;
 
-  const w = part.width * 0.9;
-  const h = (CONNECTOR_TEMPLATE.height / CONNECTOR_TEMPLATE.width) * w;
-  const flip = (pos === 'top' && type === 'PIN') || (pos === 'bottom' && type === 'BOX');
+  const scale = (part.width * 0.8) / CONNECTOR_TEMPLATE.width;
+  const w = CONNECTOR_TEMPLATE.width * scale;
+  const h = CONNECTOR_TEMPLATE.height * scale;
+  const flip = (pos === 'top' && type === 'PIN') ||
+               (pos === 'bottom' && type === 'BOX');
   const x0 = part.x + (part.width - w) / 2;
   let y0;
   if (pos === 'top') y0 = type === 'PIN' ? part.y - h : part.y;
@@ -1634,24 +1697,26 @@ function createConnector(part, pos, type) {
 
   const g = document.createElementNS(svgNS, 'g');
   g.classList.add('connector-shape');
+  g.style.pointerEvents = 'none';
 
-  const rect = document.createElementNS(svgNS, 'rect');
-  rect.setAttribute('x', x0);
-  rect.setAttribute('y', y0);
-  rect.setAttribute('width', w);
-  rect.setAttribute('height', h);
-  rect.setAttribute('fill', '#cccccc');
-  if (type === 'BOX') rect.setAttribute('fill-opacity', '0.8');
-  g.appendChild(rect);
+  const transform = flip
+    ? `translate(${x0}, ${y0 + h}) scale(${scale}, -${scale})`
+    : `translate(${x0}, ${y0}) scale(${scale})`;
+  g.setAttribute('transform', transform);
 
-  CONNECTOR_TEMPLATE.lines.forEach((t) => {
+  CONNECTOR_TEMPLATE.parts.forEach((p) => {
+    const poly = document.createElementNS(svgNS, 'polygon');
+    poly.setAttribute('points', p.points);
+    poly.setAttribute('fill', '#cccccc');
+    g.appendChild(poly);
+  });
+
+  CONNECTOR_TEMPLATE.lines.forEach((l) => {
     const line = document.createElementNS(svgNS, 'line');
-    const y1 = flip ? 1 - t.relY1 : t.relY1;
-    const y2 = flip ? 1 - t.relY2 : t.relY2;
-    line.setAttribute('x1', x0 + t.relX1 * w);
-    line.setAttribute('y1', y0 + y1 * h);
-    line.setAttribute('x2', x0 + t.relX2 * w);
-    line.setAttribute('y2', y0 + y2 * h);
+    line.setAttribute('x1', l.x1);
+    line.setAttribute('y1', l.y1);
+    line.setAttribute('x2', l.x2);
+    line.setAttribute('y2', l.y2);
     line.setAttribute('stroke', 'black');
     line.setAttribute('stroke-width', 2);
     g.appendChild(line);
