@@ -32,22 +32,25 @@ let snapEnabled = false;
 let snapIndicator = null;
 let shapeStrokeWidth = 2;
 
-const CONNECTOR_TEMPLATE = {
-  width: 432,
-  height: 372,
-  lines: [
-    { relX1: -0.00328808922558913, relY1: -0.003148066902194428, relX2: 1.0733901515151516, relY2: 0.1003465567537196 },
-    { relX1: -0.07841435185185185, relY1: 0.08241522733045466, relX2: 1.0648148148148149, relY2: 0.196998560663788 },
-    { relX1: -0.06586199294532603, relY1: 0.1825496359326052, relX2: 1.05890376984127, relY2: 0.29108458216916444 },
-    { relX1: -0.04861111111111164, relY1: 0.3918910337820676, relX2: 1.041666666666666, relY2: 0.507866456209103 },
-    { relX1: -0.0434165564373901, relY1: 0.49128939527720333, relX2: 1.0336337081128748, relY2: 0.6045766456612279 },
-    { relX1: -0.03352347883597944, relY1: 0.5951360414625592, relX2: 1.0233548280423277, relY2: 0.7219921602541618 },
-    { relX1: -0.023148148148148674, relY1: 0.6969985606637881, relX2: 1.0119047619047612, relY2: 0.8296150481189852 },
-    { relX1: -0.018490961199294935, relY1: 0.7981410337820675, relX2: 1.002783289241622, relY2: 0.9345977670129944 },
-    { relX1: -0.05890376984127033, relY1: 0.2863802810938957, relX2: 1.0480324074074068, relY2: 0.3982754423842183 },
-    { relX1: -0.010921466650633196, relY1: 0.9020836861118167, relX2: 0.8100060626102292, relY2: 0.9984738550826306 },
-  ],
-};
+let CONNECTOR_TEMPLATE = null;
+function loadConnectorTemplate() {
+  return fetch('threads.json')
+    .then((r) => r.json())
+    .then((data) => {
+      const part = data.parts[data.parts.length - 1];
+      const lines = (data.drawnShapes || [])
+        .filter((s) => s.type === 'line')
+        .map((s) => ({
+          relX1: s.relX1,
+          relY1: s.relY1,
+          relX2: s.relX2,
+          relY2: s.relY2,
+        }));
+      CONNECTOR_TEMPLATE = { width: part.width, height: part.height, lines };
+    })
+    .catch((err) => console.error('Failed to load threads.json', err));
+}
+loadConnectorTemplate();
 
 snapIndicator = document.createElementNS(svgNS, 'circle');
 snapIndicator.setAttribute('r', 4);
@@ -1621,10 +1624,14 @@ function removeConnector(part, pos) {
 }
 
 function createConnector(part, pos, type) {
+  if (!CONNECTOR_TEMPLATE) {
+    setTimeout(() => createConnector(part, pos, type), 100);
+    return;
+  }
   if (!part.connectors) part.connectors = {};
   removeConnector(part, pos);
 
-  const w = part.width * 0.9;
+  const w = part.width * 0.8;
   const h = (CONNECTOR_TEMPLATE.height / CONNECTOR_TEMPLATE.width) * w;
   const flip = (pos === 'top' && type === 'PIN') || (pos === 'bottom' && type === 'BOX');
   const x0 = part.x + (part.width - w) / 2;
@@ -1634,6 +1641,7 @@ function createConnector(part, pos, type) {
 
   const g = document.createElementNS(svgNS, 'g');
   g.classList.add('connector-shape');
+  g.style.pointerEvents = 'none';
 
   const rect = document.createElementNS(svgNS, 'rect');
   rect.setAttribute('x', x0);
