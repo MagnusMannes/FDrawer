@@ -19,7 +19,6 @@ let copiedColor = null;
 let copiedShape = null;
 let contextPart = null;
 let contextShape = null;
-let contextConnectorPos = null;
 const menu = document.getElementById("contextMenu");
 const canvasArea = document.getElementById("canvas_area");
 let zoom = 1;
@@ -32,9 +31,6 @@ let circleCenter = null;
 let snapEnabled = false;
 let snapIndicator = null;
 let shapeStrokeWidth = 2;
-
-const CONNECTOR_SCALE_DEFAULT = 0.9;
-const CONNECTOR_TIP_RATIO = 0.6;
 
 const CONNECTOR_TEMPLATE = {
   width: 432,
@@ -424,26 +420,6 @@ document.getElementById("deleteShapeMenu").addEventListener("click", () => {
   menu.style.display = "none";
   contextShape = null;
   contextPart = null;
-  contextConnectorPos = null;
-});
-
-document.getElementById('resizeConnectorMenu').addEventListener('click', () => {
-  if (contextPart && contextConnectorPos) {
-    const conn = contextPart.connectors && contextPart.connectors[contextConnectorPos];
-    if (conn) {
-      const val = prompt('Enter connector scale (0.1-1):', conn.scale);
-      const num = parseFloat(val);
-      if (!isNaN(num) && num > 0 && num <= 1) {
-        conn.scale = num;
-        createConnector(contextPart, contextConnectorPos, conn.type);
-      } else if (val !== null) {
-        alert('Invalid scale');
-      }
-    }
-  }
-  menu.style.display = 'none';
-  contextPart = null;
-  contextConnectorPos = null;
 });
 
 document.getElementById("setSizeMenu").addEventListener("click", () => {
@@ -480,14 +456,12 @@ document.getElementById("resetView").addEventListener("click", () => {
   updateZoom();
   menu.style.display = "none";
   contextPart = null;
-  contextConnectorPos = null;
 });
 
 document.addEventListener("click", () => {
   menu.style.display = "none";
   contextPart = null;
   contextShape = null;
-  contextConnectorPos = null;
 });
 
 document.getElementById("exportBtn").addEventListener("click", () => {
@@ -1649,58 +1623,59 @@ function removeConnector(part, pos) {
 
 function createConnector(part, pos, type) {
   if (!part.connectors) part.connectors = {};
-  const prev = part.connectors[pos];
-  const scale = prev && prev.scale ? prev.scale : CONNECTOR_SCALE_DEFAULT;
   removeConnector(part, pos);
 
-  const baseW = part.width * scale;
-  const tipW = baseW * CONNECTOR_TIP_RATIO;
-  const h = (CONNECTOR_TEMPLATE.height / CONNECTOR_TEMPLATE.width) * baseW;
-  const xBase = part.x + (part.width - baseW) / 2;
-  const xTip = part.x + (part.width - tipW) / 2;
-  const baseY = pos === 'top' ? part.y : part.y + part.height;
-  const tipY = pos === 'top' ? baseY - h : baseY + h;
+  const w = part.width;
+  const h = (CONNECTOR_TEMPLATE.height / CONNECTOR_TEMPLATE.width) * w;
+  const flip = pos === 'bottom';
+  const x0 = part.x;
+  let y0;
+  if (pos === 'top') y0 = type === 'PIN' ? part.y - h : part.y;
+  else y0 = type === 'PIN' ? part.y + part.height : part.y + part.height - h;
 
   const g = document.createElementNS(svgNS, 'g');
   g.classList.add('connector-shape');
-  g.addEventListener('contextmenu', (e) => showContextMenu(e, part, null, pos));
 
+  const inset = (CONNECTOR_TEMPLATE.topInset / CONNECTOR_TEMPLATE.width) * w;
   const polygon = document.createElementNS(svgNS, 'polygon');
-  const points = pos === 'top'
+  const points = flip
     ? [
-        [xBase, baseY],
-        [xBase + baseW, baseY],
-        [xTip + tipW, tipY],
-        [xTip, tipY],
+        [x0, y0 + h],
+        [x0 + w, y0 + h],
+        [x0 + w - inset, y0],
+        [x0 + inset, y0],
       ]
     : [
-        [xTip, tipY],
-        [xTip + tipW, tipY],
-        [xBase + baseW, baseY],
-        [xBase, baseY],
+        [x0 + inset, y0],
+        [x0 + w - inset, y0],
+        [x0 + w, y0 + h],
+        [x0, y0 + h],
       ];
-  polygon.setAttribute('points', points.map((p) => `${p[0]},${p[1]}`).join(' '));
+  polygon.setAttribute(
+    'points',
+    points
+      .map((p) => `${p[0]},${p[1]}`)
+      .join(' ')
+  );
   polygon.setAttribute('fill', '#cccccc');
   if (type === 'BOX') polygon.setAttribute('fill-opacity', '0.8');
   g.appendChild(polygon);
 
   CONNECTOR_TEMPLATE.lines.forEach((t) => {
     const line = document.createElementNS(svgNS, 'line');
-    const y1 = pos === 'bottom' ? 1 - t.relY1 : t.relY1;
-    const y2 = pos === 'bottom' ? 1 - t.relY2 : t.relY2;
-    const startY = pos === 'top' ? baseY - y1 * h : baseY + y1 * h;
-    const endY = pos === 'top' ? baseY - y2 * h : baseY + y2 * h;
-    line.setAttribute('x1', xBase + t.relX1 * baseW);
-    line.setAttribute('y1', startY);
-    line.setAttribute('x2', xBase + t.relX2 * baseW);
-    line.setAttribute('y2', endY);
+    const y1 = flip ? 1 - t.relY1 : t.relY1;
+    const y2 = flip ? 1 - t.relY2 : t.relY2;
+    line.setAttribute('x1', x0 + t.relX1 * w);
+    line.setAttribute('y1', y0 + y1 * h);
+    line.setAttribute('x2', x0 + t.relX2 * w);
+    line.setAttribute('y2', y0 + y2 * h);
     line.setAttribute('stroke', 'black');
     line.setAttribute('stroke-width', 2);
     g.appendChild(line);
   });
 
   drawLayer.appendChild(g);
-  part.connectors[pos] = { type, group: g, scale };
+  part.connectors[pos] = { type, group: g };
 }
 
 function updateConnectors(part) {
@@ -1752,19 +1727,16 @@ function removePart(part) {
   updateCanvasSize();
 }
 
-function showContextMenu(e, part = null, shape = null, connectorPos = null) {
+function showContextMenu(e, part = null, shape = null) {
   e.preventDefault();
   e.stopPropagation();
   contextPart = part;
   contextShape = shape;
-  contextConnectorPos = connectorPos;
   document.getElementById('copyColorMenu').style.display = part ? 'block' : 'none';
   document.getElementById('pasteColorMenu').style.display = part && copiedColor ? 'block' : 'none';
   document.getElementById('copyShapeMenu').style.display = part ? 'block' : 'none';
   document.getElementById('pasteShapeMenu').style.display =
     part && copiedShape ? 'block' : 'none';
-  document.getElementById('resizeConnectorMenu').style.display =
-    connectorPos ? 'block' : 'none';
   document.getElementById('setSizeMenu').style.display = part ? 'block' : 'none';
   document.getElementById('removeBody').style.display = part ? 'block' : 'none';
   document.getElementById('attachShapeMenu').style.display =
