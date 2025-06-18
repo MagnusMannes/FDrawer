@@ -37,16 +37,37 @@ function loadConnectorTemplate() {
   return fetch('threads.json')
     .then((r) => r.json())
     .then((data) => {
-      const part = data.parts[data.parts.length - 1];
-      const lines = (data.drawnShapes || [])
+      const parts = data.parts || [];
+      const shapes = data.drawnShapes || [];
+      if (!parts.length) return;
+
+      const minX = Math.min(...parts.map((p) => p.x));
+      const minY = Math.min(...parts.map((p) => p.y));
+      const maxX = Math.max(...parts.map((p) => p.x + p.width));
+      const maxY = Math.max(...parts.map((p) => p.y + p.height));
+      const width = maxX - minX;
+      const height = maxY - minY;
+
+      const relParts = parts.map((p) => ({
+        x: (p.x - minX) / width,
+        y: (p.y - minY) / height,
+        width: p.width / width,
+        height: p.height / height,
+        color: p.color || '#cccccc',
+      }));
+
+      const relLines = shapes
         .filter((s) => s.type === 'line')
         .map((s) => ({
+          parentIndex: s.parentIndex,
           relX1: s.relX1,
           relY1: s.relY1,
           relX2: s.relX2,
           relY2: s.relY2,
+          width: s.width || 2,
         }));
-      CONNECTOR_TEMPLATE = { width: part.width, height: part.height, lines };
+
+      CONNECTOR_TEMPLATE = { width, height, parts: relParts, lines: relLines };
     })
     .catch((err) => console.error('Failed to load threads.json', err));
 }
@@ -1633,7 +1654,8 @@ function createConnector(part, pos, type) {
 
   const w = part.width * 0.8;
   const h = (CONNECTOR_TEMPLATE.height / CONNECTOR_TEMPLATE.width) * w;
-  const flip = (pos === 'top' && type === 'PIN') || (pos === 'bottom' && type === 'BOX');
+  const flip =
+    (pos === 'top' && type === 'PIN') || (pos === 'bottom' && type === 'BOX');
   const x0 = part.x + (part.width - w) / 2;
   let y0;
   if (pos === 'top') y0 = type === 'PIN' ? part.y - h : part.y;
@@ -1642,26 +1664,37 @@ function createConnector(part, pos, type) {
   const g = document.createElementNS(svgNS, 'g');
   g.classList.add('connector-shape');
   g.style.pointerEvents = 'none';
+  if (type === 'BOX') g.setAttribute('opacity', '0.8');
 
-  const rect = document.createElementNS(svgNS, 'rect');
-  rect.setAttribute('x', x0);
-  rect.setAttribute('y', y0);
-  rect.setAttribute('width', w);
-  rect.setAttribute('height', h);
-  rect.setAttribute('fill', '#cccccc');
-  if (type === 'BOX') rect.setAttribute('fill-opacity', '0.8');
-  g.appendChild(rect);
+  // draw connector parts
+  CONNECTOR_TEMPLATE.parts.forEach((p) => {
+    const rect = document.createElementNS(svgNS, 'rect');
+    const px = x0 + p.x * w;
+    const py = flip ? y0 + (1 - p.y - p.height) * h : y0 + p.y * h;
+    rect.setAttribute('x', px);
+    rect.setAttribute('y', py);
+    rect.setAttribute('width', p.width * w);
+    rect.setAttribute('height', p.height * h);
+    rect.setAttribute('fill', p.color);
+    g.appendChild(rect);
+  });
 
+  // draw connector lines
   CONNECTOR_TEMPLATE.lines.forEach((t) => {
+    const parent = CONNECTOR_TEMPLATE.parts[t.parentIndex];
+    const px = x0 + parent.x * w;
+    const py = flip ? y0 + (1 - parent.y - parent.height) * h : y0 + parent.y * h;
+    const ph = parent.height * h;
+    const pw = parent.width * w;
     const line = document.createElementNS(svgNS, 'line');
     const y1 = flip ? 1 - t.relY1 : t.relY1;
     const y2 = flip ? 1 - t.relY2 : t.relY2;
-    line.setAttribute('x1', x0 + t.relX1 * w);
-    line.setAttribute('y1', y0 + y1 * h);
-    line.setAttribute('x2', x0 + t.relX2 * w);
-    line.setAttribute('y2', y0 + y2 * h);
+    line.setAttribute('x1', px + t.relX1 * pw);
+    line.setAttribute('y1', py + y1 * ph);
+    line.setAttribute('x2', px + t.relX2 * pw);
+    line.setAttribute('y2', py + y2 * ph);
     line.setAttribute('stroke', 'black');
-    line.setAttribute('stroke-width', 2);
+    line.setAttribute('stroke-width', t.width);
     g.appendChild(line);
   });
 
