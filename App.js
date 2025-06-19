@@ -4,6 +4,8 @@ canvas.addEventListener("contextmenu", (e) => {
   e.preventDefault();
   showContextMenu(e);
 });
+const defs = document.createElementNS(svgNS, "defs");
+canvas.appendChild(defs);
 const drawLayer = document.createElementNS(svgNS, "g");
 canvas.appendChild(drawLayer);
 const axisLayer = document.createElementNS(svgNS, "g");
@@ -19,6 +21,7 @@ let copiedColor = null;
 let copiedShape = null;
 let contextPart = null;
 let contextShape = null;
+let contextConnector = null;
 const menu = document.getElementById("contextMenu");
 const canvasArea = document.getElementById("canvas_area");
 let zoom = 1;
@@ -309,6 +312,7 @@ document.getElementById("colorPicker").addEventListener("input", (e) => {
     saveState();
     selectedPart.color = e.target.value;
     selectedPart.shape.setAttribute("fill", e.target.value);
+    applyPartGradient(selectedPart);
   }
 });
 
@@ -324,6 +328,7 @@ document.getElementById("pasteColor").addEventListener("click", () => {
     saveState();
     selectedPart.color = copiedColor;
     selectedPart.shape.setAttribute("fill", copiedColor);
+    applyPartGradient(selectedPart);
     document.getElementById("colorPicker").value = copiedColor;
   }
 });
@@ -352,6 +357,7 @@ document.getElementById("pasteColorMenu").addEventListener("click", () => {
     saveState();
     contextPart.color = copiedColor;
     contextPart.shape.setAttribute("fill", copiedColor);
+    applyPartGradient(contextPart);
     document.getElementById("colorPicker").value = copiedColor;
   }
   menu.style.display = "none";
@@ -413,6 +419,18 @@ document.getElementById("deleteShapeMenu").addEventListener("click", () => {
   contextPart = null;
 });
 
+document.getElementById("toggle3dMenu").addEventListener("click", () => {
+  if (contextPart) {
+    togglePart3D(contextPart);
+  } else if (contextConnector) {
+    toggleConnector3D(contextConnector);
+  }
+  menu.style.display = "none";
+  contextPart = null;
+  contextShape = null;
+  contextConnector = null;
+});
+
 document.getElementById("setSizeMenu").addEventListener("click", () => {
   if (contextPart) {
     saveState();
@@ -453,6 +471,7 @@ document.addEventListener("click", () => {
   menu.style.display = "none";
   contextPart = null;
   contextShape = null;
+  contextConnector = null;
 });
 
 document.getElementById("exportBtn").addEventListener("click", () => {
@@ -597,6 +616,7 @@ function addBody() {
     bottomLabel,
   };
   parts.push(part);
+  enable3DEffect(part);
   addPartEventListeners(part);
   // add default corner vertices for easier dragging
   addCornerVertices(part);
@@ -787,6 +807,7 @@ function createPartFromData(p) {
   });
 
   parts.push(partData);
+  enable3DEffect(partData);
   updatePolygonShape(partData);
   updateVertexHandles(partData);
   addPartEventListeners(partData);
@@ -916,6 +937,7 @@ function applyShapeToPart(part, data) {
 
   updatePolygonShape(part);
   updateVertexHandles(part);
+  if (part.has3d) applyPartGradient(part);
   toggleHandles(part, false);
 }
 
@@ -1332,6 +1354,133 @@ function parseDimension(input, defUnit) {
   return unit === 'in' ? val * PX_PER_INCH : val * PX_PER_CM;
 }
 
+function hexToRgb(hex) {
+  hex = hex.replace('#', '');
+  if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+  const num = parseInt(hex, 16);
+  return [num >> 16, (num >> 8) & 255, num & 255];
+}
+
+function rgbToHex(r, g, b) {
+  return (
+    '#' +
+    [r, g, b]
+      .map((v) => {
+        const h = v.toString(16);
+        return h.length === 1 ? '0' + h : h;
+      })
+      .join('')
+  );
+}
+
+function lightenColor(color, p) {
+  const [r, g, b] = hexToRgb(color);
+  const nr = Math.round(r + (255 - r) * p);
+  const ng = Math.round(g + (255 - g) * p);
+  const nb = Math.round(b + (255 - b) * p);
+  return rgbToHex(nr, ng, nb);
+}
+
+function darkenColor(color, p) {
+  const [r, g, b] = hexToRgb(color);
+  const nr = Math.round(r * (1 - p));
+  const ng = Math.round(g * (1 - p));
+  const nb = Math.round(b * (1 - p));
+  return rgbToHex(nr, ng, nb);
+}
+
+function createCylinderGradient(color) {
+  const id = 'grad-' + Math.random().toString(36).substr(2, 9);
+  const grad = document.createElementNS(svgNS, 'linearGradient');
+  grad.setAttribute('id', id);
+  grad.setAttribute('x1', '0%');
+  grad.setAttribute('y1', '0%');
+  grad.setAttribute('x2', '100%');
+  grad.setAttribute('y2', '0%');
+
+  const dark = darkenColor(color, 0.25);
+  const light = lightenColor(color, 0.2);
+  const highlight = lightenColor(color, 0.4);
+
+  const stops = [
+    { o: '0%', c: dark },
+    { o: '25%', c: light },
+    { o: '50%', c: highlight },
+    { o: '75%', c: light },
+    { o: '100%', c: dark },
+  ];
+  stops.forEach((s) => {
+    const st = document.createElementNS(svgNS, 'stop');
+    st.setAttribute('offset', s.o);
+    st.setAttribute('stop-color', s.c);
+    grad.appendChild(st);
+  });
+  defs.appendChild(grad);
+  return id;
+}
+
+function applyPartGradient(part) {
+  if (part.gradientId) {
+    const old = document.getElementById(part.gradientId);
+    if (old) old.remove();
+  }
+  if (part.has3d) {
+    part.gradientId = createCylinderGradient(part.color);
+    part.shape.setAttribute('fill', 'url(#' + part.gradientId + ')');
+  } else {
+    part.shape.setAttribute('fill', part.color);
+  }
+}
+
+function enable3DEffect(part) {
+  if (part.has3d) return;
+  part.has3d = true;
+  applyPartGradient(part);
+}
+
+function disable3DEffect(part) {
+  if (!part.has3d) return;
+  part.has3d = false;
+  applyPartGradient(part);
+}
+
+function togglePart3D(part) {
+  if (part.has3d) disable3DEffect(part);
+  else enable3DEffect(part);
+}
+
+function enableConnector3D(conn) {
+  if (conn.has3d) return;
+  conn.has3d = true;
+  conn.gradientIds = [];
+  const polys = Array.from(conn.group.querySelectorAll('polygon'));
+  polys.forEach((poly) => {
+    const color = poly.getAttribute('fill') || '#cccccc';
+    const id = createCylinderGradient(color);
+    poly.setAttribute('fill', 'url(#' + id + ')');
+    conn.gradientIds.push(id);
+  });
+}
+
+function disableConnector3D(conn) {
+  if (!conn.has3d) return;
+  conn.has3d = false;
+  if (conn.gradientIds) {
+    conn.gradientIds.forEach((id) => {
+      const g = document.getElementById(id);
+      if (g) g.remove();
+    });
+  }
+  const polys = Array.from(conn.group.querySelectorAll('polygon'));
+  polys.forEach((poly) => poly.setAttribute('fill', '#cccccc'));
+  conn.gradientIds = [];
+}
+
+function toggleConnector3D(conn) {
+  if (conn.has3d) disableConnector3D(conn);
+  else enableConnector3D(conn);
+}
+
 function stripShape(s) {
   const base = { type: s.type, width: s.width };
   if (s.parentPart) {
@@ -1697,7 +1846,7 @@ function createConnector(part, pos, type) {
 
   const g = document.createElementNS(svgNS, 'g');
   g.classList.add('connector-shape');
-  g.style.pointerEvents = 'none';
+  g.style.pointerEvents = 'auto';
 
   const transform = flip
     ? `translate(${x0}, ${y0 + h}) scale(${scale}, -${scale})`
@@ -1723,7 +1872,10 @@ function createConnector(part, pos, type) {
   });
 
   drawLayer.appendChild(g);
-  part.connectors[pos] = { type, group: g };
+  const conn = { type, group: g };
+  g.addEventListener('contextmenu', (e) => showContextMenu(e, null, null, conn));
+  part.connectors[pos] = conn;
+  enableConnector3D(conn);
 }
 
 function updateConnectors(part) {
@@ -1775,11 +1927,12 @@ function removePart(part) {
   updateCanvasSize();
 }
 
-function showContextMenu(e, part = null, shape = null) {
+function showContextMenu(e, part = null, shape = null, connector = null) {
   e.preventDefault();
   e.stopPropagation();
   contextPart = part;
   contextShape = shape;
+  contextConnector = connector;
   document.getElementById('copyColorMenu').style.display = part ? 'block' : 'none';
   document.getElementById('pasteColorMenu').style.display = part && copiedColor ? 'block' : 'none';
   document.getElementById('copyShapeMenu').style.display = part ? 'block' : 'none';
@@ -1792,6 +1945,7 @@ function showContextMenu(e, part = null, shape = null) {
   document.getElementById('detachShapeMenu').style.display =
     shape && shape.parentPart ? 'block' : 'none';
   document.getElementById('deleteShapeMenu').style.display = shape ? 'block' : 'none';
+  document.getElementById('toggle3dMenu').style.display = part || connector ? 'block' : 'none';
   const rect = canvasArea.getBoundingClientRect();
   menu.style.left = `${e.clientX - rect.left + canvasArea.scrollLeft}px`;
   menu.style.top = `${e.clientY - rect.top + canvasArea.scrollTop}px`;

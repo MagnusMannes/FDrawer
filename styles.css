@@ -12,7 +12,7 @@ svg{width:100%;height:100%;background:#fff;}
 .handle{fill:#0074d9;cursor:ns-resize;}
 .connector-label{font-size:10px;text-anchor:middle;dominant-baseline:middle;pointer-events:none;fill:#333;}
 .connector-label.active{font-size:12px;font-weight:bold;fill:#d00;}
-.connector-shape{pointer-events:none;}
+.connector-shape{pointer-events:auto;}
 .h-handle{fill:#0074d9;cursor:ew-resize;}
 .special-placeholder{fill:none;stroke:red;stroke-dasharray:3 2;}
 .special-form{fill:rgba(255,165,0,0.3);stroke:#ff9800;stroke-dasharray:4 2;cursor:pointer;}
