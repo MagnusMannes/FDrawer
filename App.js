@@ -28,8 +28,7 @@ let zoom = 1;
 let zoomClickCount = 0;
 let verticalScaleIndex = 0;
 const VERTICAL_SCALES = [1, 2, 4, 6, 8, 10];
-const BASE_AXIS_FONT_SIZE = 10;
-const BASE_AXIS_STROKE = 1;
+
 const undoStack = [];
 
 let drawMode = null;
@@ -2245,7 +2244,7 @@ function updateAxes() {
     txt.setAttribute('y', y + 3);
     txt.setAttribute('text-anchor', 'end');
     txt.classList.add('axis-label');
-    txt.style.fontSize = `${axisFontSize}px`;
+
     txt.textContent = i * stepCm;
     axisLayer.appendChild(txt);
   }
