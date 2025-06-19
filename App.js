@@ -2169,7 +2169,7 @@ function updateAxes() {
   axisLayer.innerHTML = '';
   if (!parts.length) return;
 
-  // keep axis elements legible when zoomed out
+
   const scaleFactor = zoom < 1 ? 1 / zoom : 1;
 
   const left = Math.min(...parts.map((p) => p.x));
