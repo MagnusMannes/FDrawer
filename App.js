@@ -2169,6 +2169,9 @@ function updateAxes() {
   axisLayer.innerHTML = '';
   if (!parts.length) return;
 
+  // keep axis elements legible when zoomed out
+  const scaleFactor = zoom < 1 ? 1 / zoom : 1;
+
   const left = Math.min(...parts.map((p) => p.x));
   const right = Math.max(...parts.map((p) => p.x + p.width));
   const top = Math.min(...parts.map((p) => p.y));
@@ -2184,6 +2187,7 @@ function updateAxes() {
   hAxis.setAttribute('x2', right);
   hAxis.setAttribute('y1', axisY);
   hAxis.setAttribute('y2', axisY);
+  hAxis.setAttribute('stroke-width', scaleFactor);
   hAxis.classList.add('axis-line');
   axisLayer.appendChild(hAxis);
 
@@ -2197,6 +2201,7 @@ function updateAxes() {
       tick.setAttribute('x2', x);
       tick.setAttribute('y1', axisY - 4);
       tick.setAttribute('y2', axisY + 4);
+      tick.setAttribute('stroke-width', scaleFactor);
       tick.classList.add('axis-line');
       axisLayer.appendChild(tick);
 
@@ -2205,6 +2210,7 @@ function updateAxes() {
       txt.setAttribute('y', axisY + 14);
       txt.setAttribute('text-anchor', 'middle');
       txt.classList.add('axis-label');
+      txt.setAttribute('font-size', 10 * scaleFactor);
       txt.textContent = i;
       axisLayer.appendChild(txt);
     });
@@ -2216,6 +2222,7 @@ function updateAxes() {
   vAxis.setAttribute('x2', axisX);
   vAxis.setAttribute('y1', bottom);
   vAxis.setAttribute('y2', top);
+  vAxis.setAttribute('stroke-width', scaleFactor);
   vAxis.classList.add('axis-line');
   axisLayer.appendChild(vAxis);
 
@@ -2228,6 +2235,7 @@ function updateAxes() {
     tick.setAttribute('x2', axisX + 4);
     tick.setAttribute('y1', y);
     tick.setAttribute('y2', y);
+    tick.setAttribute('stroke-width', scaleFactor);
     tick.classList.add('axis-line');
     axisLayer.appendChild(tick);
 
@@ -2236,9 +2244,27 @@ function updateAxes() {
     txt.setAttribute('y', y + 3);
     txt.setAttribute('text-anchor', 'end');
     txt.classList.add('axis-label');
+    txt.setAttribute('font-size', 10 * scaleFactor);
     txt.textContent = i * stepCm;
     axisLayer.appendChild(txt);
   }
+
+  const unitIn = document.createElementNS(svgNS, 'text');
+  unitIn.setAttribute('x', right + 12);
+  unitIn.setAttribute('y', axisY + 14);
+  unitIn.classList.add('axis-label');
+  unitIn.setAttribute('font-size', 10 * scaleFactor);
+  unitIn.textContent = 'inch';
+  axisLayer.appendChild(unitIn);
+
+  const unitCm = document.createElementNS(svgNS, 'text');
+  unitCm.setAttribute('x', axisX);
+  unitCm.setAttribute('y', top - 10);
+  unitCm.setAttribute('text-anchor', 'middle');
+  unitCm.classList.add('axis-label');
+  unitCm.setAttribute('font-size', 10 * scaleFactor);
+  unitCm.textContent = 'cm';
+  axisLayer.appendChild(unitCm);
 }
 
 // --- Import Logic ---
