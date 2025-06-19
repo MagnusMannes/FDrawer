@@ -28,6 +28,8 @@ let zoom = 1;
 let zoomClickCount = 0;
 let verticalScaleIndex = 0;
 const VERTICAL_SCALES = [1, 2, 4, 6, 8, 10];
+const BASE_AXIS_FONT_SIZE = 10;
+const BASE_AXIS_STROKE = 1;
 const undoStack = [];
 
 let drawMode = null;
@@ -2179,12 +2181,15 @@ function updateAxes() {
   const centerX = (left + right) / 2;
 
   const axisY = bottom + 10;
+  const axisFontSize = BASE_AXIS_FONT_SIZE + verticalScaleIndex * 2;
+  const axisStroke = BASE_AXIS_STROKE + verticalScaleIndex * 0.5;
   const hAxis = document.createElementNS(svgNS, 'line');
   hAxis.setAttribute('x1', left);
   hAxis.setAttribute('x2', right);
   hAxis.setAttribute('y1', axisY);
   hAxis.setAttribute('y2', axisY);
   hAxis.classList.add('axis-line');
+  hAxis.setAttribute('stroke-width', axisStroke);
   axisLayer.appendChild(hAxis);
 
   const maxIn = width / PX_PER_INCH;
@@ -2198,6 +2203,7 @@ function updateAxes() {
       tick.setAttribute('y1', axisY - 4);
       tick.setAttribute('y2', axisY + 4);
       tick.classList.add('axis-line');
+      tick.setAttribute('stroke-width', axisStroke);
       axisLayer.appendChild(tick);
 
       const txt = document.createElementNS(svgNS, 'text');
@@ -2205,6 +2211,7 @@ function updateAxes() {
       txt.setAttribute('y', axisY + 14);
       txt.setAttribute('text-anchor', 'middle');
       txt.classList.add('axis-label');
+      txt.setAttribute('font-size', axisFontSize);
       txt.textContent = i;
       axisLayer.appendChild(txt);
     });
@@ -2217,6 +2224,7 @@ function updateAxes() {
   vAxis.setAttribute('y1', bottom);
   vAxis.setAttribute('y2', top);
   vAxis.classList.add('axis-line');
+  vAxis.setAttribute('stroke-width', axisStroke);
   axisLayer.appendChild(vAxis);
 
   const stepCm = VERTICAL_SCALES[verticalScaleIndex];
@@ -2229,6 +2237,7 @@ function updateAxes() {
     tick.setAttribute('y1', y);
     tick.setAttribute('y2', y);
     tick.classList.add('axis-line');
+    tick.setAttribute('stroke-width', axisStroke);
     axisLayer.appendChild(tick);
 
     const txt = document.createElementNS(svgNS, 'text');
@@ -2236,6 +2245,7 @@ function updateAxes() {
     txt.setAttribute('y', y + 3);
     txt.setAttribute('text-anchor', 'end');
     txt.classList.add('axis-label');
+    txt.setAttribute('font-size', axisFontSize);
     txt.textContent = i * stepCm;
     axisLayer.appendChild(txt);
   }
