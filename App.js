@@ -2169,7 +2169,6 @@ function updateAxes() {
   axisLayer.innerHTML = '';
   if (!parts.length) return;
 
-
   const scaleFactor = zoom < 1 ? 1 / zoom : 1;
 
   const left = Math.min(...parts.map((p) => p.x));
