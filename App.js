@@ -25,6 +25,9 @@ let contextConnector = null;
 const menu = document.getElementById("contextMenu");
 const canvasArea = document.getElementById("canvas_area");
 let zoom = 1;
+let zoomClickCount = 0;
+let verticalScaleIndex = 0;
+const VERTICAL_SCALES = [1, 2, 4, 6, 8, 10];
 const undoStack = [];
 
 let drawMode = null;
@@ -122,10 +125,14 @@ drawCircleBtn.addEventListener('dblclick', () => {
 });
 document.getElementById('zoomIn').addEventListener('click', () => {
   zoom = Math.min(3, zoom + 0.1);
+  if (zoomClickCount > 0) zoomClickCount--;
+  verticalScaleIndex = Math.min(5, Math.floor(zoomClickCount / 2));
   updateZoom();
 });
 document.getElementById('zoomOut').addEventListener('click', () => {
   zoom = Math.max(0.01, zoom - 0.1);
+  zoomClickCount++;
+  verticalScaleIndex = Math.min(5, Math.floor(zoomClickCount / 2));
   updateZoom();
 });
 
@@ -248,6 +255,7 @@ function updateZoom() {
   canvas.style.transformOrigin = "0 0";
   canvas.style.transform = `scale(${zoom})`;
   centerDiagram();
+  updateAxes();
   // ensure centering after transform is applied
   requestAnimationFrame(centerDiagram);
 }
@@ -462,6 +470,8 @@ document.getElementById("setSizeMenu").addEventListener("click", () => {
 
 document.getElementById("resetView").addEventListener("click", () => {
   zoom = 1;
+  zoomClickCount = 0;
+  verticalScaleIndex = 0;
   updateZoom();
   menu.style.display = "none";
   contextPart = null;
@@ -2209,9 +2219,10 @@ function updateAxes() {
   vAxis.classList.add('axis-line');
   axisLayer.appendChild(vAxis);
 
+  const stepCm = VERTICAL_SCALES[verticalScaleIndex];
   const maxCm = height / PX_PER_CM;
-  for (let i = 0; i <= Math.ceil(maxCm); i++) {
-    const y = bottom - i * PX_PER_CM;
+  for (let i = 0; i <= Math.ceil(maxCm / stepCm); i++) {
+    const y = bottom - i * stepCm * PX_PER_CM;
     const tick = document.createElementNS(svgNS, 'line');
     tick.setAttribute('x1', axisX - 4);
     tick.setAttribute('x2', axisX + 4);
@@ -2225,7 +2236,7 @@ function updateAxes() {
     txt.setAttribute('y', y + 3);
     txt.setAttribute('text-anchor', 'end');
     txt.classList.add('axis-label');
-    txt.textContent = i;
+    txt.textContent = i * stepCm;
     axisLayer.appendChild(txt);
   }
 }
