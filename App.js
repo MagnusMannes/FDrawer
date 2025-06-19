@@ -2171,10 +2171,12 @@ function updateAxes() {
 
   // Increase the visible size of the axes when zooming out so labels remain
   // legible. The canvas itself is scaled by `zoom`, therefore we adjust the
-  // stroke width and font size based on the zoom level. When zooming out the
-  // factor becomes `1/zoom` (using `1/(zoom*zoom)` before scaling), while for
-  // zooming in we keep the size roughly constant.
-  const scaleFactor = zoom <= 1 ? 1 / (zoom * zoom) : 1 / zoom;
+  // stroke width and font size based on the zoom level. When the axis scale
+  // shows 1 cm steps (verticalScaleIndex === 0) we keep the labels at their
+  // normal size. Otherwise we enlarge them using an additional factor so the
+  // text remains readable as the drawing shrinks on screen.
+  const base = zoom <= 1 ? 1 / (zoom * zoom) : 1 / zoom;
+  const scaleFactor = verticalScaleIndex === 0 ? 1 / zoom : base;
 
   const left = Math.min(...parts.map((p) => p.x));
   const right = Math.max(...parts.map((p) => p.x + p.width));
