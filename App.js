@@ -4,8 +4,6 @@ canvas.addEventListener("contextmenu", (e) => {
   e.preventDefault();
   showContextMenu(e);
 });
-const defs = document.createElementNS(svgNS, "defs");
-canvas.appendChild(defs);
 const drawLayer = document.createElementNS(svgNS, "g");
 canvas.appendChild(drawLayer);
 const axisLayer = document.createElementNS(svgNS, "g");
@@ -33,61 +31,6 @@ let circleCenter = null;
 let snapEnabled = false;
 let snapIndicator = null;
 let shapeStrokeWidth = 2;
-
-function shadeColor(color, percent) {
-  let num = parseInt(color.slice(1), 16);
-  let amt = Math.round(2.55 * percent);
-  let r = (num >> 16) + amt;
-  let g = ((num >> 8) & 0xff) + amt;
-  let b = (num & 0xff) + amt;
-  r = Math.max(Math.min(255, r), 0);
-  g = Math.max(Math.min(255, g), 0);
-  b = Math.max(Math.min(255, b), 0);
-  return (
-    "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)
-  );
-}
-
-function createGradient(id, baseColor) {
-  const grad = document.createElementNS(svgNS, "linearGradient");
-  grad.setAttribute("id", id);
-  grad.setAttribute("x1", "0%");
-  grad.setAttribute("y1", "0%");
-  grad.setAttribute("x2", "100%");
-  grad.setAttribute("y2", "0%");
-  const stop1 = document.createElementNS(svgNS, "stop");
-  stop1.setAttribute("offset", "0%");
-  stop1.setAttribute("stop-color", shadeColor(baseColor, 40));
-  const stop2 = document.createElementNS(svgNS, "stop");
-  stop2.setAttribute("offset", "50%");
-  stop2.setAttribute("stop-color", baseColor);
-  const stop3 = document.createElementNS(svgNS, "stop");
-  stop3.setAttribute("offset", "100%");
-  stop3.setAttribute("stop-color", shadeColor(baseColor, -40));
-  grad.appendChild(stop1);
-  grad.appendChild(stop2);
-  grad.appendChild(stop3);
-  defs.appendChild(grad);
-  return grad;
-}
-
-function toggle3DEffect(part) {
-  part.is3D = !part.is3D;
-  if (part.is3D) {
-    if (!part.gradientId) {
-      part.gradientId = `grad-${Date.now()}-${Math.random()}`;
-      createGradient(part.gradientId, part.color);
-    }
-    part.shape.setAttribute("fill", `url(#${part.gradientId})`);
-  } else {
-    if (part.gradientId) {
-      const grad = document.getElementById(part.gradientId);
-      if (grad) grad.remove();
-      part.gradientId = null;
-    }
-    part.shape.setAttribute("fill", part.color);
-  }
-}
 
 let CONNECTOR_TEMPLATE = null;
 
@@ -365,22 +308,7 @@ document.getElementById("colorPicker").addEventListener("input", (e) => {
   if (selectedPart) {
     saveState();
     selectedPart.color = e.target.value;
-    if (selectedPart.is3D) {
-      if (selectedPart.gradientId) {
-        const grad = document.getElementById(selectedPart.gradientId);
-        if (grad) grad.remove();
-        createGradient(selectedPart.gradientId, selectedPart.color);
-      } else {
-        selectedPart.gradientId = `grad-${Date.now()}-${Math.random()}`;
-        createGradient(selectedPart.gradientId, selectedPart.color);
-      }
-      selectedPart.shape.setAttribute(
-        "fill",
-        `url(#${selectedPart.gradientId})`
-      );
-    } else {
-      selectedPart.shape.setAttribute("fill", e.target.value);
-    }
+    selectedPart.shape.setAttribute("fill", e.target.value);
   }
 });
 
@@ -395,22 +323,7 @@ document.getElementById("pasteColor").addEventListener("click", () => {
   if (selectedPart && copiedColor) {
     saveState();
     selectedPart.color = copiedColor;
-    if (selectedPart.is3D) {
-      if (selectedPart.gradientId) {
-        const grad = document.getElementById(selectedPart.gradientId);
-        if (grad) grad.remove();
-        createGradient(selectedPart.gradientId, selectedPart.color);
-      } else {
-        selectedPart.gradientId = `grad-${Date.now()}-${Math.random()}`;
-        createGradient(selectedPart.gradientId, selectedPart.color);
-      }
-      selectedPart.shape.setAttribute(
-        "fill",
-        `url(#${selectedPart.gradientId})`
-      );
-    } else {
-      selectedPart.shape.setAttribute("fill", copiedColor);
-    }
+    selectedPart.shape.setAttribute("fill", copiedColor);
     document.getElementById("colorPicker").value = copiedColor;
   }
 });
@@ -438,22 +351,7 @@ document.getElementById("pasteColorMenu").addEventListener("click", () => {
   if (contextPart && copiedColor) {
     saveState();
     contextPart.color = copiedColor;
-    if (contextPart.is3D) {
-      if (contextPart.gradientId) {
-        const grad = document.getElementById(contextPart.gradientId);
-        if (grad) grad.remove();
-        createGradient(contextPart.gradientId, contextPart.color);
-      } else {
-        contextPart.gradientId = `grad-${Date.now()}-${Math.random()}`;
-        createGradient(contextPart.gradientId, contextPart.color);
-      }
-      contextPart.shape.setAttribute(
-        "fill",
-        `url(#${contextPart.gradientId})`
-      );
-    } else {
-      contextPart.shape.setAttribute("fill", copiedColor);
-    }
+    contextPart.shape.setAttribute("fill", copiedColor);
     document.getElementById("colorPicker").value = copiedColor;
   }
   menu.style.display = "none";
@@ -515,15 +413,6 @@ document.getElementById("deleteShapeMenu").addEventListener("click", () => {
   contextPart = null;
 });
 
-document.getElementById("toggle3dMenu").addEventListener("click", () => {
-  if (contextPart) {
-    saveState();
-    toggle3DEffect(contextPart);
-  }
-  menu.style.display = "none";
-  contextPart = null;
-});
-
 document.getElementById("setSizeMenu").addEventListener("click", () => {
   if (contextPart) {
     saveState();
@@ -574,7 +463,6 @@ document.getElementById("exportBtn").addEventListener("click", () => {
       width: p.width,
       height: p.height,
       color: p.color,
-      is3D: p.is3D,
       topConnector: p.topConnector,
       bottomConnector: p.bottomConnector,
       special: p.special,
@@ -693,8 +581,6 @@ function addBody() {
     width,
     height,
     color: "#cccccc",
-    is3D: false,
-    gradientId: null,
     topConnector: "none",
     bottomConnector: "none",
     special: false,
@@ -726,7 +612,6 @@ function exportPart(part) {
     width: part.width,
     height: part.height,
     color: part.color,
-    is3D: part.is3D,
     topConnector: part.topConnector,
     bottomConnector: part.bottomConnector,
     special: part.special,
@@ -881,8 +766,6 @@ function createPartFromData(p) {
     specialForms,
     symVertices,
     vertexHandles,
-    is3D: false,
-    gradientId: null,
   };
 
   // ensure corner vertices are present
@@ -904,9 +787,6 @@ function createPartFromData(p) {
   });
 
   parts.push(partData);
-  if (p.is3D) {
-    toggle3DEffect(partData);
-  }
   updatePolygonShape(partData);
   updateVertexHandles(partData);
   addPartEventListeners(partData);
@@ -1863,10 +1743,6 @@ function removePart(part) {
     removeConnector(part, 'top');
     removeConnector(part, 'bottom');
   }
-  if (part.gradientId) {
-    const grad = document.getElementById(part.gradientId);
-    if (grad) grad.remove();
-  }
   canvas.removeChild(part.g);
   parts.splice(idx, 1);
   if (selectedPart === part) selectedPart = null;
@@ -1909,7 +1785,6 @@ function showContextMenu(e, part = null, shape = null) {
   document.getElementById('copyShapeMenu').style.display = part ? 'block' : 'none';
   document.getElementById('pasteShapeMenu').style.display =
     part && copiedShape ? 'block' : 'none';
-  document.getElementById('toggle3dMenu').style.display = part ? 'block' : 'none';
   document.getElementById('setSizeMenu').style.display = part ? 'block' : 'none';
   document.getElementById('removeBody').style.display = part ? 'block' : 'none';
   document.getElementById('attachShapeMenu').style.display =
