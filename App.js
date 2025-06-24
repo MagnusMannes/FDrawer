@@ -2371,6 +2371,47 @@ function updateAxes() {
   unitCm.setAttribute('font-size', 10 * scaleFactor);
   unitCm.textContent = 'cm';
   axisLayer.appendChild(unitCm);
+
+  // draw an additional vertical axis for each body
+  const bodyAxisStartX = axisX + 20; // start a bit right of the main axis
+  const bodyAxisSpacing = 18; // distance between each body axis
+  parts.forEach((p, idx) => {
+    const bx = bodyAxisStartX + idx * bodyAxisSpacing;
+    const topY = p.y * zoom;
+    const bottomY = (p.y + p.height) * zoom;
+
+    const bAxis = document.createElementNS(svgNS, 'line');
+    bAxis.setAttribute('x1', bx);
+    bAxis.setAttribute('x2', bx);
+    bAxis.setAttribute('y1', bottomY);
+    bAxis.setAttribute('y2', topY);
+    bAxis.setAttribute('stroke-width', scaleFactor);
+    bAxis.classList.add('axis-line');
+    axisLayer.appendChild(bAxis);
+
+    // ticks at top and bottom
+    ['top', 'bottom'].forEach((pos) => {
+      const y = pos === 'top' ? topY : bottomY;
+      const tick = document.createElementNS(svgNS, 'line');
+      tick.setAttribute('x1', bx - 4);
+      tick.setAttribute('x2', bx + 4);
+      tick.setAttribute('y1', y);
+      tick.setAttribute('y2', y);
+      tick.setAttribute('stroke-width', scaleFactor);
+      tick.classList.add('axis-line');
+      axisLayer.appendChild(tick);
+    });
+
+    const txt = document.createElementNS(svgNS, 'text');
+    txt.setAttribute('x', bx + 6);
+    txt.setAttribute('y', (topY + bottomY) / 2);
+    txt.setAttribute('text-anchor', 'start');
+    txt.classList.add('axis-label');
+    txt.setAttribute('font-size', 9 * scaleFactor);
+    const lenCm = (p.height / PX_PER_CM).toFixed(1).replace(/\.0$/, '');
+    txt.textContent = `${lenCm}cm`;
+    axisLayer.appendChild(txt);
+  });
 }
 
 // --- Import Logic ---
