@@ -6,8 +6,10 @@ canvas.addEventListener("contextmenu", (e) => {
 });
 const defs = document.createElementNS(svgNS, "defs");
 canvas.appendChild(defs);
+const zoomLayer = document.createElementNS(svgNS, "g");
+canvas.appendChild(zoomLayer);
 const drawLayer = document.createElementNS(svgNS, "g");
-canvas.appendChild(drawLayer);
+zoomLayer.appendChild(drawLayer);
 const axisLayer = document.createElementNS(svgNS, "g");
 canvas.appendChild(axisLayer);
 const uiLayer = document.createElementNS(svgNS, "g");
@@ -136,13 +138,13 @@ drawCircleBtn.addEventListener('dblclick', () => {
   if (!isNaN(val) && val > 0) shapeStrokeWidth = val;
 });
 document.getElementById('zoomIn').addEventListener('click', () => {
-  zoom = Math.min(3, zoom + 0.1);
+  zoom = Math.min(3, zoom + 0.25);
   if (zoomClickCount > 0) zoomClickCount--;
   verticalScaleIndex = Math.min(5, Math.floor(zoomClickCount / 2));
   updateZoom();
 });
 document.getElementById('zoomOut').addEventListener('click', () => {
-  zoom = Math.max(0.01, zoom - 0.1);
+  zoom = Math.max(0.25, zoom - 0.25);
   zoomClickCount++;
   verticalScaleIndex = Math.min(5, Math.floor(zoomClickCount / 2));
   updateZoom();
@@ -264,8 +266,8 @@ function handleMouseMove(e) {
 window.addEventListener("resize", centerDiagram);
 
 function updateZoom() {
-  canvas.style.transformOrigin = "0 0";
-  canvas.style.transform = `scale(${zoom})`;
+  zoomLayer.style.transformOrigin = "0 0";
+  zoomLayer.style.transform = `scale(${zoom})`;
   centerDiagram();
   updateAxes();
   // ensure centering after transform is applied
@@ -613,8 +615,8 @@ function addBody() {
   g.appendChild(topLabel);
   g.appendChild(bottomLabel);
 
-  canvas.appendChild(g);
-  canvas.appendChild(drawLayer);
+  zoomLayer.appendChild(g);
+  zoomLayer.appendChild(drawLayer);
 
   const part = {
     x,
@@ -789,8 +791,8 @@ function createPartFromData(p) {
     });
   }
 
-  canvas.appendChild(g);
-  canvas.appendChild(drawLayer);
+  zoomLayer.appendChild(g);
+  zoomLayer.appendChild(drawLayer);
 
   const partData = {
     ...p,
@@ -2265,14 +2267,9 @@ function updateAxes() {
   axisLayer.innerHTML = '';
   if (!parts.length) return;
 
-  // Increase the visible size of the axes when zooming out so labels remain
-  // legible. The canvas itself is scaled by `zoom`, therefore we adjust the
-  // stroke width and font size based on the zoom level. Previously the labels
-  // used `1/zoom` when the vertical scale step was 1&nbsp;cm which meant the
-  // on-screen size stayed constant. We always want the text to become larger
-  // as the diagram shrinks, so use the more aggressive scaling factor for all
-  // zoom levels.
-  const scaleFactor = zoom <= 1 ? 1 / (zoom * zoom) : 1 / zoom;
+  // Axis elements are not transformed with the rest of the diagram. Therefore
+  // no scaling of stroke width or font size is required.
+  const scaleFactor = 1;
 
   const left = Math.min(...parts.map((p) => p.x));
   const right = Math.max(...parts.map((p) => p.x + p.width));
@@ -2283,10 +2280,10 @@ function updateAxes() {
   const height = bottom - top;
   const centerX = (left + right) / 2;
 
-  const axisY = bottom + 10;
+  const axisY = bottom * zoom + 10;
   const hAxis = document.createElementNS(svgNS, 'line');
-  hAxis.setAttribute('x1', left);
-  hAxis.setAttribute('x2', right);
+  hAxis.setAttribute('x1', left * zoom);
+  hAxis.setAttribute('x2', right * zoom);
   hAxis.setAttribute('y1', axisY);
   hAxis.setAttribute('y2', axisY);
   hAxis.setAttribute('stroke-width', scaleFactor);
@@ -2295,9 +2292,9 @@ function updateAxes() {
 
   const maxIn = width / PX_PER_INCH;
   for (let i = 0; i <= Math.ceil(maxIn); i++) {
-    const d = (i / 2) * PX_PER_INCH;
+    const d = (i / 2) * PX_PER_INCH * zoom;
     [-1, 1].forEach((s) => {
-      const x = centerX + s * d;
+      const x = centerX * zoom + s * d;
       const tick = document.createElementNS(svgNS, 'line');
       tick.setAttribute('x1', x);
       tick.setAttribute('x2', x);
@@ -2318,12 +2315,12 @@ function updateAxes() {
     });
   }
 
-  const axisX = left - 20;
+  const axisX = left * zoom - 20;
   const vAxis = document.createElementNS(svgNS, 'line');
   vAxis.setAttribute('x1', axisX);
   vAxis.setAttribute('x2', axisX);
-  vAxis.setAttribute('y1', bottom);
-  vAxis.setAttribute('y2', top);
+  vAxis.setAttribute('y1', bottom * zoom);
+  vAxis.setAttribute('y2', top * zoom);
   vAxis.setAttribute('stroke-width', scaleFactor);
   vAxis.classList.add('axis-line');
   axisLayer.appendChild(vAxis);
@@ -2331,7 +2328,7 @@ function updateAxes() {
   const stepCm = VERTICAL_SCALES[verticalScaleIndex];
   const maxCm = height / PX_PER_CM;
   for (let i = 0; i <= Math.ceil(maxCm / stepCm); i++) {
-    const y = bottom - i * stepCm * PX_PER_CM;
+    const y = bottom * zoom - i * stepCm * PX_PER_CM * zoom;
     const tick = document.createElementNS(svgNS, 'line');
     tick.setAttribute('x1', axisX - 4);
     tick.setAttribute('x2', axisX + 4);
@@ -2352,7 +2349,7 @@ function updateAxes() {
   }
 
   const unitIn = document.createElementNS(svgNS, 'text');
-  unitIn.setAttribute('x', right + 12);
+  unitIn.setAttribute('x', right * zoom + 12);
   unitIn.setAttribute('y', axisY + 14);
   unitIn.classList.add('axis-label');
   unitIn.setAttribute('font-size', 10 * scaleFactor);
@@ -2361,7 +2358,7 @@ function updateAxes() {
 
   const unitCm = document.createElementNS(svgNS, 'text');
   unitCm.setAttribute('x', axisX);
-  unitCm.setAttribute('y', top - 10);
+  unitCm.setAttribute('y', top * zoom - 10);
   unitCm.setAttribute('text-anchor', 'middle');
   unitCm.classList.add('axis-label');
   unitCm.setAttribute('font-size', 10 * scaleFactor);
@@ -2375,10 +2372,12 @@ function clearCanvas() {
   parts.length = 0;
   drawnShapes.length = 0;
   drawLayer.innerHTML = '';
+  zoomLayer.innerHTML = '';
   axisLayer.innerHTML = '';
   selectedPart = null;
   canvas.appendChild(defs);
-  canvas.appendChild(drawLayer);
+  canvas.appendChild(zoomLayer);
+  zoomLayer.appendChild(drawLayer);
   canvas.appendChild(axisLayer);
   canvas.appendChild(uiLayer);
   updateCanvasSize();
