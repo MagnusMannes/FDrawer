@@ -1199,11 +1199,11 @@ function specialContext(e) {
   }
 }
 function labelFor(s) {
-  return s === "none" ? "" : s;
+  return s === "PIN" ? "PIN" : "";
 }
 function updateConnectorLabelClass(label, state) {
-  if (state === "none") label.classList.remove("active");
-  else label.classList.add("active");
+  if (state === "PIN") label.classList.add("active");
+  else label.classList.remove("active");
 }
 
 // --- Resize Logic ---
@@ -1951,7 +1951,14 @@ function createConnector(part, pos, type) {
   CONNECTOR_TEMPLATE.parts.forEach((p) => {
     const poly = document.createElementNS(svgNS, 'polygon');
     poly.setAttribute('points', p.points);
-    poly.setAttribute('fill', '#cccccc');
+    if (type === 'BOX') {
+      poly.setAttribute('fill', '#b3b3b3');
+      poly.setAttribute('stroke', '#555');
+      poly.setAttribute('stroke-width', 1);
+      poly.setAttribute('stroke-dasharray', '4 2');
+    } else {
+      poly.setAttribute('fill', '#cccccc');
+    }
     g.appendChild(poly);
   });
 
@@ -1961,8 +1968,9 @@ function createConnector(part, pos, type) {
     line.setAttribute('y1', l.y1);
     line.setAttribute('x2', l.x2);
     line.setAttribute('y2', l.y2);
-    line.setAttribute('stroke', 'black');
+    line.setAttribute('stroke', type === 'BOX' ? '#555' : 'black');
     line.setAttribute('stroke-width', 2);
+    if (type === 'BOX') line.setAttribute('stroke-dasharray', '4 2');
     g.appendChild(line);
   });
 
