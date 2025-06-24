@@ -2373,12 +2373,10 @@ function updateAxes() {
   axisLayer.appendChild(unitCm);
 
   // draw an additional vertical axis for each body
-  // place these axes to the left of the total length line and
-  // allow them to overlap since bodies will not overlap vertically
-  const bodyAxisStartX = axisX - 12; // start a bit left of the main axis
-  const bodyAxisSpacing = 0; // axes share the same x-position
-  parts.forEach((p, idx) => {
-    const bx = bodyAxisStartX + idx * bodyAxisSpacing;
+  // place these axes on the right side of each body
+  const bodyAxisOffset = 12; // space between body and axis
+  parts.forEach((p) => {
+    const bx = (p.x + p.width) * zoom + bodyAxisOffset;
     const topY = p.y * zoom;
     const bottomY = (p.y + p.height) * zoom;
 
