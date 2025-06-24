@@ -1963,7 +1963,9 @@ function removePart(part) {
     removeConnector(part, 'top');
     removeConnector(part, 'bottom');
   }
-  canvas.removeChild(part.g);
+  if (part.g && part.g.parentNode) {
+    part.g.parentNode.removeChild(part.g);
+  }
   parts.splice(idx, 1);
   if (selectedPart === part) selectedPart = null;
   let baseY = idx > 0 ? parts[idx - 1].y + parts[idx - 1].height : TOP_MARGIN;
