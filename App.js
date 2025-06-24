@@ -165,7 +165,7 @@ snapBtn.addEventListener('click', () => {
 function handleCanvasClick(e) {
   if (!drawMode) return;
   e.stopPropagation();
-  let { x, y } = getSnappedPosition(e.offsetX, e.offsetY, false);
+  let { x, y } = getSnappedPosition(e.offsetX / zoom, e.offsetY / zoom, false);
   if (drawMode === 'line') {
     if (!lineStart) {
       lineStart = { x, y };
@@ -248,7 +248,7 @@ canvas.addEventListener('mousedown', (e) => {
 });
 
 function handleMouseMove(e) {
-  const { x, y } = getSnappedPosition(e.offsetX, e.offsetY);
+  const { x, y } = getSnappedPosition(e.offsetX / zoom, e.offsetY / zoom);
   if (!drawMode || !tempShape) return;
   if (drawMode === 'line') {
     tempShape.setAttribute('x2', x);
@@ -1050,7 +1050,7 @@ function selectPart(part) {
 
 function handleConnectorToggle(evt, part) {
   saveState();
-  const y = evt.offsetY;
+  const y = evt.offsetY / zoom;
   const rectY = part.y;
   const h = part.height;
   if (y < rectY + 10) {
@@ -1075,7 +1075,7 @@ function nextState(s) {
 // --- Special Feature Toggling ---
 function toggleSpecialVertex(e, part) {
   saveState();
-  const offsetY = e.offsetY - part.y;
+  const offsetY = e.offsetY / zoom - part.y;
   const existingIndex = part.symVertices.findIndex((v) => Math.abs(v.y - offsetY) < 5);
   if (existingIndex !== -1) {
     const vertex = part.symVertices.splice(existingIndex, 1)[0];
@@ -1104,7 +1104,7 @@ function toggleSpecialVertex(e, part) {
     vertex.handleLeft = hl;
     vertex.handleRight = hr;
     part.vertexHandles.push(hl, hr);
-    const fromLeft = e.offsetX - part.x < part.width / 2;
+    const fromLeft = e.offsetX / zoom - part.x < part.width / 2;
     startVertexDrag(e, part, vertex, fromLeft ? "left" : "right");
   }
   updatePolygonShape(part);
