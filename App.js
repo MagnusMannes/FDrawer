@@ -59,8 +59,19 @@ const APP_VERSION = "1.0";
 document.getElementById("version").textContent = APP_VERSION;
 document.getElementById("lastUpdated").textContent = new Date(document.lastModified).toLocaleString();
 
+function connectorOffset(p, pos) {
+  if (!CONNECTOR_TEMPLATE) return 0;
+  const type = pos === 'top' ? p.topConnector : p.bottomConnector;
+  if (type !== 'PIN') return 0;
+  const scale = (p.width * 0.8) / CONNECTOR_TEMPLATE.width;
+  return CONNECTOR_TEMPLATE.height * scale;
+}
+
 function updateCanvasSize() {
-  const bottom = parts.reduce((m, p) => Math.max(m, p.y + p.height), 0);
+  const bottom = parts.reduce(
+    (m, p) => Math.max(m, p.y + p.height + connectorOffset(p, 'bottom')),
+    0
+  );
   const right = parts.reduce((m, p) => Math.max(m, p.x + p.width), 0);
   const newH = Math.max(canvasArea.clientHeight, bottom + 40);
   const newW = Math.max(canvasArea.clientWidth, right + 40);
@@ -827,6 +838,7 @@ function createPartFromData(p) {
   if (partData.bottomConnector && partData.bottomConnector !== 'none')
     createConnector(partData, 'bottom', partData.bottomConnector);
   updateCanvasSize();
+  ensureTopConnectorVisible();
   return partData;
 }
 
@@ -1047,6 +1059,7 @@ function handleConnectorToggle(evt, part) {
     if (part.bottomConnector === 'none') removeConnector(part, 'bottom');
     else createConnector(part, 'bottom', part.bottomConnector);
   }
+  ensureTopConnectorVisible();
 }
 function nextState(s) {
   return s === "none" ? "PIN" : s === "PIN" ? "BOX" : "none";
@@ -1588,6 +1601,78 @@ function updatePartHeight(part, newH) {
   updateCanvasSize();
 }
 
+function shiftDiagramDown(dy) {
+  if (!dy) return;
+  parts.forEach((p) => {
+    p.y += dy;
+    p.rect.setAttribute('y', p.y);
+    p.handle.setAttribute('y', p.y + p.height - 5);
+    p.leftHandle.setAttribute('y', p.y + p.height / 2 - 5);
+    p.rightHandle.setAttribute('y', p.y + p.height / 2 - 5);
+    p.topLabel.setAttribute('y', p.y - 6);
+    p.bottomLabel.setAttribute('y', p.y + p.height + 6);
+    if (p.specialIcon) {
+      p.specialIcon.setAttribute('y', p.y + p.height / 2 - 7);
+    }
+    if (p.specialForms) {
+      p.specialForms.forEach((sf) => {
+        if (sf.rect)
+          sf.rect.setAttribute(
+            'y',
+            parseFloat(sf.rect.getAttribute('y')) + dy
+          );
+        if (sf.rect2)
+          sf.rect2.setAttribute(
+            'y',
+            parseFloat(sf.rect2.getAttribute('y')) + dy
+          );
+      });
+    }
+    updatePolygonShape(p);
+    updateVertexHandles(p);
+    updateAttachedShapes(p);
+    updateConnectors(p);
+  });
+  drawnShapes.forEach((s) => {
+    if (s.parentPart) return;
+    if (s.type === 'line') {
+      s.y1 += dy;
+      s.y2 += dy;
+      s.elem.setAttribute('y1', s.y1);
+      s.elem.setAttribute('y2', s.y2);
+    } else if (s.type === 'circle') {
+      s.cy += dy;
+      s.elem.setAttribute('cy', s.cy);
+    } else if (s.type === 'curve') {
+      s.p0.y += dy;
+      s.p1.y += dy;
+      s.p2.y += dy;
+      s.elem.setAttribute(
+        'd',
+        `M ${s.p0.x} ${s.p0.y} Q ${s.p1.x} ${s.p1.y} ${s.p2.x} ${s.p2.y}`
+      );
+    }
+    updateShapeHandles(s);
+  });
+  updateCanvasSize();
+}
+
+function ensureTopConnectorVisible() {
+  if (!CONNECTOR_TEMPLATE || !parts.length) return;
+  let minY = Infinity;
+  parts.forEach((p) => {
+    let off = 0;
+    if (p.topConnector === 'PIN') {
+      const scale = (p.width * 0.8) / CONNECTOR_TEMPLATE.width;
+      off = CONNECTOR_TEMPLATE.height * scale;
+    }
+    minY = Math.min(minY, p.y - off);
+  });
+  if (minY < 0) {
+    shiftDiagramDown(-minY);
+  }
+}
+
 // --- Polygon Shape Helpers ---
 function updatePolygonShape(part) {
   const x = part.x;
@@ -1886,6 +1971,7 @@ function createConnector(part, pos, type) {
   g.addEventListener('contextmenu', (e) => showContextMenu(e, null, null, conn));
   part.connectors[pos] = conn;
   enableConnector3D(conn);
+  ensureTopConnectorVisible();
 }
 
 function updateConnectors(part) {
@@ -2301,6 +2387,7 @@ function loadFromData(data) {
     });
   }
   updateCanvasSize();
+  ensureTopConnectorVisible();
 }
 
 // capture initial empty state
