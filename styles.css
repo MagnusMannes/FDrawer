@@ -29,4 +29,3 @@ svg{width:100%;height:100%;background:#fff;}
 .preview-shape{stroke-dasharray:4 2;}
 .axis-line{stroke:#000;}
 .axis-label{font-size:10px;fill:#000;dominant-baseline:middle;}
-.snap-indicator{pointer-events:none;}
