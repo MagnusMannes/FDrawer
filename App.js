@@ -28,6 +28,7 @@ let zoom = 1;
 let zoomClickCount = 0;
 let verticalScaleIndex = 0;
 const VERTICAL_SCALES = [1, 2, 4, 6, 8, 10];
+const TOP_MARGIN = 20;
 const undoStack = [];
 
 let drawMode = null;
@@ -67,7 +68,7 @@ function connectorOffset(p, pos) {
   return CONNECTOR_TEMPLATE.height * scale;
 }
 
-function updateCanvasSize() {
+function updateCanvasSize(skipCenter = false) {
   const bottom = parts.reduce(
     (m, p) => Math.max(m, p.y + p.height + connectorOffset(p, 'bottom')),
     0
@@ -79,7 +80,7 @@ function updateCanvasSize() {
   canvas.style.width = `${newW}px`;
   canvas.setAttribute('height', newH);
   canvas.setAttribute('width', newW);
-  centerDiagram();
+  if (!skipCenter) centerDiagram();
   updateAxes();
 }
 
@@ -560,7 +561,7 @@ function addBody() {
     y = last.y + last.height;
   } else {
     x = canvas.clientWidth / 2 - width / 2;
-    y = 20;
+    y = TOP_MARGIN;
   }
 
   const g = document.createElementNS(svgNS, "g");
@@ -1323,7 +1324,7 @@ function stopHResize() {
   window.removeEventListener("touchmove", doHResize);
   window.removeEventListener("mouseup", stopHResize);
   window.removeEventListener("touchend", stopHResize);
-  updateCanvasSize();
+  updateCanvasSize(true);
 }
 
 function updatePartWidth(part) {
@@ -1553,7 +1554,7 @@ function applyNewWidth(part, newW) {
   updatePartWidth(part);
   updateAttachedShapes(part);
   updateConnectors(part);
-  updateCanvasSize();
+  updateCanvasSize(true);
 }
 
 function updatePartHeight(part, newH) {
@@ -1668,8 +1669,9 @@ function ensureTopConnectorVisible() {
     }
     minY = Math.min(minY, p.y - off);
   });
-  if (minY < 0) {
-    shiftDiagramDown(-minY);
+  const delta = TOP_MARGIN - minY;
+  if (delta !== 0) {
+    shiftDiagramDown(delta);
   }
 }
 
@@ -2002,7 +2004,7 @@ function removePart(part) {
   canvas.removeChild(part.g);
   parts.splice(idx, 1);
   if (selectedPart === part) selectedPart = null;
-  let baseY = idx > 0 ? parts[idx - 1].y + parts[idx - 1].height : 20;
+  let baseY = idx > 0 ? parts[idx - 1].y + parts[idx - 1].height : TOP_MARGIN;
   for (let i = idx; i < parts.length; i++) {
     const p = parts[i];
     const dy = baseY - p.y;
