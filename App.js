@@ -59,8 +59,19 @@ const APP_VERSION = "1.0";
 document.getElementById("version").textContent = APP_VERSION;
 document.getElementById("lastUpdated").textContent = new Date(document.lastModified).toLocaleString();
 
+function connectorOffset(p, pos) {
+  if (!CONNECTOR_TEMPLATE) return 0;
+  const type = pos === 'top' ? p.topConnector : p.bottomConnector;
+  if (type !== 'PIN') return 0;
+  const scale = (p.width * 0.8) / CONNECTOR_TEMPLATE.width;
+  return CONNECTOR_TEMPLATE.height * scale;
+}
+
 function updateCanvasSize() {
-  const bottom = parts.reduce((m, p) => Math.max(m, p.y + p.height), 0);
+  const bottom = parts.reduce(
+    (m, p) => Math.max(m, p.y + p.height + connectorOffset(p, 'bottom')),
+    0
+  );
   const right = parts.reduce((m, p) => Math.max(m, p.x + p.width), 0);
   const newH = Math.max(canvasArea.clientHeight, bottom + 40);
   const newW = Math.max(canvasArea.clientWidth, right + 40);
