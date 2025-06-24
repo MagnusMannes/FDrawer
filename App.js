@@ -82,8 +82,10 @@ function updateCanvasSize(skipCenter = false) {
     0
   );
   const right = parts.reduce((m, p) => Math.max(m, p.x + p.width), 0);
-  const newH = Math.max(canvasArea.clientHeight, bottom + 40);
-  const newW = Math.max(canvasArea.clientWidth, right + 40);
+  const scaledH = bottom * zoom + 40;
+  const scaledW = right * zoom + 40;
+  const newH = Math.max(canvasArea.clientHeight, scaledH, bottom + 40);
+  const newW = Math.max(canvasArea.clientWidth, scaledW, right + 40);
   canvas.style.height = `${newH}px`;
   canvas.style.width = `${newW}px`;
   canvas.setAttribute('height', newH);
@@ -273,6 +275,7 @@ window.addEventListener("resize", centerDiagram);
 function updateZoom() {
   zoomLayer.style.transformOrigin = "0 0";
   zoomLayer.style.transform = `scale(${zoom})`;
+  updateCanvasSize(true);
   centerDiagram();
   updateAxes();
   // ensure centering after transform is applied
