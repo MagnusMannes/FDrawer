@@ -485,7 +485,9 @@ document.getElementById("exportBtn").addEventListener("click", () => {
   });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = "diagram.json";
+  const safeName = (partNameInput.value.trim() || "diagram")
+    .replace(/[^a-z0-9_-]/gi, "_");
+  a.download = `${safeName}.json`;
   a.click();
 });
 
