@@ -2281,8 +2281,10 @@ function clearCanvas() {
   drawLayer.innerHTML = '';
   axisLayer.innerHTML = '';
   selectedPart = null;
+  canvas.appendChild(defs);
   canvas.appendChild(drawLayer);
   canvas.appendChild(axisLayer);
+  canvas.appendChild(uiLayer);
   updateCanvasSize();
 }
 function loadFromData(data) {
