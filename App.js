@@ -26,6 +26,7 @@ let contextShape = null;
 let contextConnector = null;
 const menu = document.getElementById("contextMenu");
 const canvasArea = document.getElementById("canvas_area");
+const partNameInput = document.getElementById("partName");
 let zoom = 1;
 let verticalScaleIndex = 0;
 function updateVerticalScaleIndex() {
@@ -43,8 +44,6 @@ let drawMode = null;
 let lineStart = null;
 let curvePoints = [];
 let circleCenter = null;
-let snapEnabled = false;
-let snapIndicator = null;
 let shapeStrokeWidth = 2;
 
 let CONNECTOR_TEMPLATE = null;
@@ -55,14 +54,6 @@ fetch('threads.json')
     CONNECTOR_TEMPLATE = preprocessConnectorTemplate(d);
   })
   .catch((e) => console.error('Failed to load threads.json', e));
-
-snapIndicator = document.createElementNS(svgNS, 'circle');
-snapIndicator.setAttribute('r', 4);
-snapIndicator.setAttribute('fill', 'none');
-snapIndicator.setAttribute('stroke', 'red');
-snapIndicator.style.display = 'none';
-snapIndicator.classList.add('snap-indicator');
-uiLayer.appendChild(snapIndicator);
 
 const APP_VERSION = "1.0";
 document.getElementById("version").textContent = APP_VERSION;
@@ -157,17 +148,11 @@ document.getElementById('zoomOut').addEventListener('click', () => {
   updateZoom();
 });
 
-const snapBtn = document.getElementById('toggleSnap');
-snapBtn.addEventListener('click', () => {
-  snapEnabled = !snapEnabled;
-  snapBtn.classList.toggle('active', snapEnabled);
-  snapIndicator.style.display = 'none';
-});
 
 function handleCanvasClick(e) {
   if (!drawMode) return;
   e.stopPropagation();
-  let { x, y } = getSnappedPosition(e.offsetX / zoom, e.offsetY / zoom, false);
+  let { x, y } = getSnappedPosition(e.offsetX / zoom, e.offsetY / zoom);
   if (drawMode === 'line') {
     if (!lineStart) {
       lineStart = { x, y };
@@ -282,48 +267,13 @@ function updateZoom() {
   requestAnimationFrame(centerDiagram);
 }
 
-function getSnappedPosition(x, y, showIndicator = true) {
-  if (!snapEnabled) {
-    if (showIndicator) snapIndicator.style.display = 'none';
-    return { x, y };
-  }
-  let closest = null;
-  let minDist = 8;
-  parts.forEach((p) => {
-    const pts = [
-      [p.x, p.y],
-      [p.x + p.width / 2, p.y],
-      [p.x + p.width, p.y],
-      [p.x, p.y + p.height / 2],
-      [p.x + p.width, p.y + p.height / 2],
-      [p.x, p.y + p.height],
-      [p.x + p.width / 2, p.y + p.height],
-      [p.x + p.width, p.y + p.height],
-    ];
-    pts.forEach(([px, py]) => {
-      const dx = px - x;
-      const dy = py - y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < minDist) {
-        minDist = dist;
-        closest = { x: px, y: py };
-      }
-    });
-  });
-  if (closest) {
-    if (showIndicator) {
-      snapIndicator.style.display = 'block';
-      snapIndicator.setAttribute('cx', closest.x);
-      snapIndicator.setAttribute('cy', closest.y);
-    }
-    return closest;
-  }
-  if (showIndicator) snapIndicator.style.display = 'none';
+function getSnappedPosition(x, y) {
   return { x, y };
 }
 
 function saveState() {
   const state = JSON.stringify({
+    name: partNameInput.value,
     parts: parts.map((p) => exportPart(p)),
     drawnShapes: drawnShapes.map(stripShape),
   });
@@ -507,6 +457,7 @@ document.addEventListener("click", () => {
 
 document.getElementById("exportBtn").addEventListener("click", () => {
   const data = {
+    name: partNameInput.value,
     parts: parts.map((p) => ({
       x: parseFloat(p.rect.getAttribute("x")),
       y: parseFloat(p.rect.getAttribute("y")),
@@ -2432,6 +2383,7 @@ function clearCanvas() {
 }
 function loadFromData(data) {
   clearCanvas();
+  partNameInput.value = data.name || '';
   if (data.parts) {
     data.parts.forEach((p) => {
       createPartFromData(p);
