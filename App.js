@@ -27,8 +27,14 @@ let contextConnector = null;
 const menu = document.getElementById("contextMenu");
 const canvasArea = document.getElementById("canvas_area");
 let zoom = 1;
-let zoomClickCount = 0;
 let verticalScaleIndex = 0;
+function updateVerticalScaleIndex() {
+  if (zoom < 1) {
+    verticalScaleIndex = Math.min(5, Math.floor((1 - zoom) / 0.5));
+  } else {
+    verticalScaleIndex = 0;
+  }
+}
 const VERTICAL_SCALES = [1, 2, 4, 6, 8, 10];
 const TOP_MARGIN = 20;
 const undoStack = [];
@@ -88,11 +94,12 @@ function updateCanvasSize(skipCenter = false) {
 
 function centerDiagram() {
   if (!parts.length) return;
-  const axisOffset = 20; // account for left axis in centering
   const left = Math.min(...parts.map((p) => p.x));
   const right = Math.max(...parts.map((p) => p.x + p.width));
-  const cx = (left - axisOffset + right) / 2;
-  const desiredLeft = cx * zoom - canvasArea.clientWidth / 2;
+  const centerX = (left + right) / 2;
+  // include the 20px wide left axis which is not scaled with zoom
+  const axisOffset = 10; // half of the fixed 20px axis width
+  const desiredLeft = centerX * zoom - axisOffset - canvasArea.clientWidth / 2;
   canvasArea.scrollLeft = Math.max(0, desiredLeft);
   const margin = desiredLeft < 0 ? -desiredLeft : 0;
   canvas.style.marginLeft = `${margin}px`;
@@ -139,14 +146,12 @@ drawCircleBtn.addEventListener('dblclick', () => {
 });
 document.getElementById('zoomIn').addEventListener('click', () => {
   zoom = Math.min(3, zoom + 0.25);
-  if (zoomClickCount > 0) zoomClickCount--;
-  verticalScaleIndex = Math.min(5, Math.floor(zoomClickCount / 2));
+  updateVerticalScaleIndex();
   updateZoom();
 });
 document.getElementById('zoomOut').addEventListener('click', () => {
   zoom = Math.max(0.25, zoom - 0.25);
-  zoomClickCount++;
-  verticalScaleIndex = Math.min(5, Math.floor(zoomClickCount / 2));
+  updateVerticalScaleIndex();
   updateZoom();
 });
 
@@ -484,8 +489,7 @@ document.getElementById("setSizeMenu").addEventListener("click", () => {
 
 document.getElementById("resetView").addEventListener("click", () => {
   zoom = 1;
-  zoomClickCount = 0;
-  verticalScaleIndex = 0;
+  updateVerticalScaleIndex();
   updateZoom();
   menu.style.display = "none";
   contextPart = null;
