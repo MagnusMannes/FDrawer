@@ -27,6 +27,11 @@ let contextConnector = null;
 const menu = document.getElementById("contextMenu");
 const canvasArea = document.getElementById("canvas_area");
 const partNameInput = document.getElementById("partName");
+const finishedBtn = document.getElementById("finishedBtn");
+const launchedFromFDiagram = !!window.opener;
+if (launchedFromFDiagram) {
+  finishedBtn.style.display = "block";
+}
 let zoom = 1;
 let verticalScaleIndex = 0;
 function updateVerticalScaleIndex() {
@@ -455,31 +460,16 @@ document.addEventListener("click", () => {
   contextConnector = null;
 });
 
-document.getElementById("exportBtn").addEventListener("click", () => {
-  const data = {
+function collectComponentData() {
+  return {
     name: partNameInput.value,
-    parts: parts.map((p) => ({
-      x: parseFloat(p.rect.getAttribute("x")),
-      y: parseFloat(p.rect.getAttribute("y")),
-      width: p.width,
-      height: p.height,
-      color: p.color,
-      topConnector: p.topConnector,
-      bottomConnector: p.bottomConnector,
-      special: p.special,
-      specialForms: (p.specialForms || []).map((f) => ({
-        x: parseFloat(f.rect.getAttribute("x")),
-        y: parseFloat(f.rect.getAttribute("y")),
-        width: parseFloat(f.rect.getAttribute("width")),
-        height: parseFloat(f.rect.getAttribute("height")),
-        rx: parseFloat(f.rect.getAttribute("rx")) || 0,
-        side: f.side,
-        symmetrical: !!f.rect2,
-      })),
-      symVertices: (p.symVertices || []).map((v) => ({ y: v.y, dx: v.dx })),
-    })),
+    parts: parts.map((p) => exportPart(p)),
     drawnShapes: drawnShapes.map(stripShape),
   };
+}
+
+document.getElementById("exportBtn").addEventListener("click", () => {
+  const data = collectComponentData();
   const blob = new Blob([JSON.stringify(data, null, 2)], {
     type: "application/json",
   });
@@ -489,6 +479,17 @@ document.getElementById("exportBtn").addEventListener("click", () => {
     .replace(/[^a-z0-9_-]/gi, "_");
   a.download = `${safeName}.json`;
   a.click();
+  if (window.opener) {
+    window.opener.postMessage({ type: "newComponent", component: data }, "*");
+  }
+});
+
+finishedBtn.addEventListener("click", () => {
+  const data = collectComponentData();
+  if (window.opener) {
+    window.opener.postMessage({ type: "newComponent", component: data }, "*");
+    window.close();
+  }
 });
 
 document.getElementById("importBtn").addEventListener("click", () =>
