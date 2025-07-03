@@ -32,6 +32,17 @@ const launchedFromFDiagram = !!window.opener;
 if (launchedFromFDiagram) {
   finishedBtn.style.display = "block";
 }
+
+// Listen for edit requests from an opener (e.g. FDiagram)
+window.addEventListener('message', (e) => {
+  if (window.opener && e.source === window.opener) {
+    const msg = e.data || {};
+    if (msg.type === 'editComponent' && msg.component) {
+      saveState();
+      loadFromData(msg.component);
+    }
+  }
+});
 let zoom = 1;
 let verticalScaleIndex = 0;
 function updateVerticalScaleIndex() {
