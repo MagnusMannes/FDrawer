@@ -54,6 +54,7 @@ function updateVerticalScaleIndex() {
 }
 const VERTICAL_SCALES = [1, 2, 4, 6, 8, 10];
 const TOP_MARGIN = 20;
+const SNAP_THRESHOLD = 10; // px distance for snapping
 const undoStack = [];
 
 let drawMode = null;
@@ -61,6 +62,8 @@ let lineStart = null;
 let curvePoints = [];
 let circleCenter = null;
 let shapeStrokeWidth = 2;
+
+let partDrag = null;
 
 let CONNECTOR_TEMPLATE = null;
 
@@ -284,7 +287,19 @@ function updateZoom() {
 }
 
 function getSnappedPosition(x, y) {
-  return { x, y };
+  let sx = x;
+  let sy = y;
+  parts.forEach((p) => {
+    const edgesX = [p.x, p.x + p.width];
+    edgesX.forEach((ex) => {
+      if (Math.abs(x - ex) <= SNAP_THRESHOLD) sx = ex;
+    });
+    const edgesY = [p.y, p.y + p.height];
+    edgesY.forEach((ey) => {
+      if (Math.abs(y - ey) <= SNAP_THRESHOLD) sy = ey;
+    });
+  });
+  return { x: sx, y: sy };
 }
 
 function saveState() {
@@ -956,6 +971,12 @@ function addPartEventListeners(part) {
     selectPart(part);
     toggleSpecialVertex(e, part);
   });
+  part.shape.addEventListener("mousedown", (e) => startPartDrag(e, part));
+  part.shape.addEventListener(
+    "touchstart",
+    (e) => startPartDrag(e, part),
+    { passive: false }
+  );
   part.g.addEventListener("contextmenu", (e) => {
 
     showContextMenu(e, part);
@@ -1299,6 +1320,75 @@ function stopHResize() {
   window.removeEventListener("mouseup", stopHResize);
   window.removeEventListener("touchend", stopHResize);
   updateCanvasSize(true);
+}
+
+function snapPartY(part, y) {
+  let snappedY = y;
+  parts.forEach((p) => {
+    if (p === part) return;
+    const top = p.y;
+    const bottom = p.y + p.height;
+    if (Math.abs(y - bottom) <= SNAP_THRESHOLD) {
+      snappedY = bottom;
+    }
+    if (Math.abs(y + part.height - top) <= SNAP_THRESHOLD) {
+      snappedY = top - part.height;
+    }
+  });
+  return snappedY;
+}
+
+function startPartDrag(e, part) {
+  if (e.button === 2) return; // allow context menu on right click
+  e.preventDefault();
+  saveState();
+  const pt = e.touches ? e.touches[0] : e;
+  partDrag = {
+    part,
+    startX: part.x,
+    startY: part.y,
+    x0: pt.clientX,
+    y0: pt.clientY,
+  };
+  window.addEventListener("mousemove", doPartDrag);
+  window.addEventListener("touchmove", doPartDrag, { passive: false });
+  window.addEventListener("mouseup", stopPartDrag);
+  window.addEventListener("touchend", stopPartDrag);
+}
+
+function doPartDrag(e) {
+  if (!partDrag) return;
+  const pt = e.touches ? e.touches[0] : e;
+  let newX = partDrag.startX + (pt.clientX - partDrag.x0) / zoom;
+  let newY = partDrag.startY + (pt.clientY - partDrag.y0) / zoom;
+  newY = snapPartY(partDrag.part, newY);
+  const p = partDrag.part;
+  p.x = newX;
+  p.y = newY;
+  updatePartWidth(p); // updates handles and labels
+  p.rect.setAttribute("y", newY);
+  p.handle.setAttribute("y", newY + p.height - 5);
+  p.leftHandle.setAttribute("y", newY + p.height / 2 - 5);
+  p.rightHandle.setAttribute("y", newY + p.height / 2 - 5);
+  p.topLabel.setAttribute("y", newY - 6);
+  p.bottomLabel.setAttribute("y", newY + p.height + 6);
+  if (p.specialIcon) {
+    p.specialIcon.setAttribute("y", newY + p.height / 2 - 7);
+  }
+  updatePolygonShape(p);
+  updateVertexHandles(p);
+  updateAttachedShapes(p);
+  updateConnectors(p);
+}
+
+function stopPartDrag() {
+  if (!partDrag) return;
+  window.removeEventListener("mousemove", doPartDrag);
+  window.removeEventListener("touchmove", doPartDrag);
+  window.removeEventListener("mouseup", stopPartDrag);
+  window.removeEventListener("touchend", stopPartDrag);
+  updateCanvasSize(true);
+  partDrag = null;
 }
 
 function updatePartWidth(part) {
