@@ -2427,7 +2427,10 @@ function loadFromData(data) {
     });
   }
   updateCanvasSize();
-  if (launchedFromFDiagram) centerDiagram();
+  if (launchedFromFDiagram) {
+    centerDiagram();
+    requestAnimationFrame(centerDiagram);
+  }
   ensureTopConnectorVisible();
 }
 
