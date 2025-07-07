@@ -657,7 +657,7 @@ function exportPart(part) {
   };
 }
 
-function createPartFromData(p) {
+function createPartFromData(p, skipUpdate = false) {
   const g = document.createElementNS(svgNS, "g");
   const shape = document.createElementNS(svgNS, "polygon");
   shape.setAttribute("fill", p.color);
@@ -825,8 +825,10 @@ function createPartFromData(p) {
     createConnector(partData, 'top', partData.topConnector);
   if (partData.bottomConnector && partData.bottomConnector !== 'none')
     createConnector(partData, 'bottom', partData.bottomConnector);
-  updateCanvasSize();
-  ensureTopConnectorVisible();
+  if (!skipUpdate) {
+    updateCanvasSize();
+    ensureTopConnectorVisible();
+  }
   return partData;
 }
 
@@ -2415,14 +2417,26 @@ function clearCanvas() {
 function loadFromData(data) {
   clearCanvas();
   partNameInput.value = data.name || '';
+  const indexMap = {};
+  let partsData = [];
   if (data.parts) {
-    data.parts.forEach((p) => {
-      createPartFromData(p);
+    partsData = data.parts.map((p, idx) => ({ ...p, _oldIndex: idx }));
+    partsData.sort((a, b) => a.y - b.y);
+    partsData.forEach((p, idx) => {
+      indexMap[p._oldIndex] = idx;
+      createPartFromData(p, true);
     });
   }
   if (data.drawnShapes) {
     data.drawnShapes.forEach((s) => {
-      const obj = createDrawnShapeFromData(s);
+      const shapeData = { ...s };
+      if (
+        typeof shapeData.parentIndex === 'number' &&
+        indexMap.hasOwnProperty(shapeData.parentIndex)
+      ) {
+        shapeData.parentIndex = indexMap[shapeData.parentIndex];
+      }
+      const obj = createDrawnShapeFromData(shapeData);
       if (obj) drawnShapes.push(obj);
     });
   }
