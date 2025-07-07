@@ -2407,6 +2407,10 @@ function clearCanvas() {
   zoomLayer.innerHTML = '';
   axisLayer.innerHTML = '';
   selectedPart = null;
+  canvas.style.marginLeft = '0px';
+  canvasArea.scrollLeft = 0;
+  canvasArea.scrollTop = 0;
+  lastScrollTop = 0;
   canvas.appendChild(defs);
   canvas.appendChild(zoomLayer);
   zoomLayer.appendChild(drawLayer);
@@ -2441,7 +2445,10 @@ function loadFromData(data) {
     });
   }
   updateCanvasSize();
-  if (launchedFromFDiagram) centerDiagram();
+  if (launchedFromFDiagram) {
+    centerDiagram();
+    requestAnimationFrame(centerDiagram);
+  }
   ensureTopConnectorVisible();
 }
 
