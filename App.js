@@ -2462,6 +2462,16 @@ function loadFromData(data) {
   // Perform another refresh on the next frame to ensure imported parts
   // render correctly when launched from FDiagram.
   requestAnimationFrame(refreshDiagram);
+  if (launchedFromFDiagram) {
+    setTimeout(() => {
+      refreshDiagram();
+      if (parts.length) {
+        const p = parts[0];
+        p.shape.setAttribute('fill', p.color);
+        applyPartGradient(p);
+      }
+    }, 500);
+  }
 }
 
 // capture initial empty state
