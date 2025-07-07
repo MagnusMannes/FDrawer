@@ -119,8 +119,7 @@ function centerDiagram() {
   const axisOffset = 10; // half of the fixed 20px axis width
   const desiredLeft = centerX * zoom - axisOffset - canvasArea.clientWidth / 2;
   canvasArea.scrollLeft = Math.max(0, desiredLeft);
-  const margin = desiredLeft < 0 ? -desiredLeft : 0;
-  canvas.style.marginLeft = `${margin}px`;
+  canvas.style.marginLeft = '0px';
   // vertical centering removed
 }
 
@@ -1249,23 +1248,7 @@ function doResize(e) {
   updateAttachedShapes(resizePart);
   updateConnectors(resizePart);
 
-  const idx = parts.indexOf(resizePart);
-  let baseY = resizePart.y + newH;
-  for (let i = idx + 1; i < parts.length; i++) {
-    parts[i].y = baseY;
-    parts[i].rect.setAttribute("y", baseY);
-    parts[i].handle.setAttribute("y", baseY + parts[i].height - 5);
-    parts[i].leftHandle.setAttribute("y", baseY + parts[i].height / 2 - 5);
-    parts[i].rightHandle.setAttribute("y", baseY + parts[i].height / 2 - 5);
-    parts[i].topLabel.setAttribute("y", baseY - 6);
-    parts[i].bottomLabel.setAttribute("y", baseY + parts[i].height + 6);
-    if (parts[i].specialIcon) {
-      parts[i].specialIcon.setAttribute("y", baseY + parts[i].height / 2 - 7);
-    }
-    updateAttachedShapes(parts[i]);
-    updateConnectors(parts[i]);
-    baseY += parts[i].height;
-  }
+  repositionFollowingParts(resizePart);
   updateCanvasSize();
 }
 function stopResize() {
@@ -1574,24 +1557,29 @@ function updatePartHeight(part, newH) {
   updateVertexHandles(part);
   updateAttachedShapes(part);
   updateConnectors(part);
-  const idx = parts.indexOf(part);
-  let baseY = part.y + newH;
-  for (let i = idx + 1; i < parts.length; i++) {
-    parts[i].y = baseY;
-    parts[i].rect.setAttribute('y', baseY);
-    parts[i].handle.setAttribute('y', baseY + parts[i].height - 5);
-    parts[i].leftHandle.setAttribute('y', baseY + parts[i].height / 2 - 5);
-    parts[i].rightHandle.setAttribute('y', baseY + parts[i].height / 2 - 5);
-    parts[i].topLabel.setAttribute('y', baseY - 6);
-    parts[i].bottomLabel.setAttribute('y', baseY + parts[i].height + 6);
-    if (parts[i].specialIcon) {
-      parts[i].specialIcon.setAttribute('y', baseY + parts[i].height / 2 - 7);
-    }
-    updateAttachedShapes(parts[i]);
-    updateConnectors(parts[i]);
-    baseY += parts[i].height;
-  }
+  repositionFollowingParts(part);
   updateCanvasSize();
+}
+
+function repositionFollowingParts(part) {
+  const idx = parts.indexOf(part);
+  let baseY = part.y + part.height;
+  for (let i = idx + 1; i < parts.length; i++) {
+    const p = parts[i];
+    p.y = baseY;
+    p.rect.setAttribute('y', baseY);
+    p.handle.setAttribute('y', baseY + p.height - 5);
+    p.leftHandle.setAttribute('y', baseY + p.height / 2 - 5);
+    p.rightHandle.setAttribute('y', baseY + p.height / 2 - 5);
+    p.topLabel.setAttribute('y', baseY - 6);
+    p.bottomLabel.setAttribute('y', baseY + p.height + 6);
+    if (p.specialIcon) {
+      p.specialIcon.setAttribute('y', baseY + p.height / 2 - 7);
+    }
+    updateAttachedShapes(p);
+    updateConnectors(p);
+    baseY += p.height;
+  }
 }
 
 function shiftDiagramDown(dy) {
