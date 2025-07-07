@@ -1266,6 +1266,7 @@ function doResize(e) {
     updateConnectors(parts[i]);
     baseY += parts[i].height;
   }
+  updateCanvasSize();
 }
 function stopResize() {
   resizing = false;
