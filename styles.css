@@ -27,7 +27,7 @@ svg{width:100%;height:100%;background:#fff;}
 .drawn-shape.selected{stroke:#0074d9;}
 .shape-handle{fill:#fff;stroke:#0074d9;stroke-width:1;pointer-events:none;}
 .preview-shape{stroke-dasharray:4 2;}
-.axis-line{stroke:#000;}
-.axis-label{font-size:10px;fill:#000;dominant-baseline:middle;}
+.axis-line{stroke:#000;pointer-events:none;}
+.axis-label{font-size:10px;fill:#000;dominant-baseline:middle;pointer-events:none;}
 .finished-btn{background:#4caf50;border-color:#4caf50;color:#000;font-weight:bold;}
 .finished-btn:hover{background:#45a049;}
