@@ -73,6 +73,9 @@ fetch('threads.json')
   .then((r) => r.json())
   .then((d) => {
     CONNECTOR_TEMPLATE = preprocessConnectorTemplate(d);
+    // Once the connector template is available re-render existing parts
+    // so their connectors are drawn correctly.
+    refreshDiagram();
   })
   .catch((e) => console.error('Failed to load threads.json', e));
 
@@ -1655,6 +1658,22 @@ function ensureTopConnectorVisible() {
   }
 }
 
+// Recalculate connectors, gradients and attached shapes for all parts
+// and update handles/axes. Useful after importing data or when the
+// connector template finishes loading.
+function refreshDiagram() {
+  parts.forEach((p) => {
+    updatePolygonShape(p);
+    updateVertexHandles(p);
+    updateAttachedShapes(p);
+    updateConnectors(p);
+    applyPartGradient(p);
+  });
+  drawnShapes.forEach((s) => updateShapeHandles(s));
+  updateCanvasSize();
+  ensureTopConnectorVisible();
+}
+
 // --- Polygon Shape Helpers ---
 function updatePolygonShape(part) {
   const x = part.x;
@@ -2439,6 +2458,7 @@ function loadFromData(data) {
     requestAnimationFrame(centerDiagram);
   }
   ensureTopConnectorVisible();
+  refreshDiagram();
 }
 
 // capture initial empty state
