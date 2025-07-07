@@ -26,6 +26,10 @@ let contextShape = null;
 let contextConnector = null;
 const menu = document.getElementById("contextMenu");
 const canvasArea = document.getElementById("canvas_area");
+let lastScrollTop = canvasArea.scrollTop;
+canvasArea.addEventListener('scroll', () => {
+  lastScrollTop = canvasArea.scrollTop;
+});
 const partNameInput = document.getElementById("partName");
 const finishedBtn = document.getElementById("finishedBtn");
 const launchedFromFDiagram = !!window.opener;
@@ -85,7 +89,7 @@ function connectorOffset(p, pos) {
 }
 
 function updateCanvasSize(skipCenter = false) {
-  const prevScrollTop = canvasArea.scrollTop;
+  const prevScrollTop = lastScrollTop;
   const bottom = parts.reduce(
     (m, p) => Math.max(m, p.y + p.height + connectorOffset(p, 'bottom')),
     0
@@ -102,6 +106,7 @@ function updateCanvasSize(skipCenter = false) {
   if (autoCenter && !skipCenter) centerDiagram();
   const maxScrollTop = Math.max(0, newH - canvasArea.clientHeight);
   canvasArea.scrollTop = Math.min(prevScrollTop, maxScrollTop);
+  lastScrollTop = canvasArea.scrollTop;
   updateAxes();
 }
 
@@ -2422,6 +2427,7 @@ function loadFromData(data) {
     });
   }
   updateCanvasSize();
+  if (launchedFromFDiagram) centerDiagram();
   ensureTopConnectorVisible();
 }
 
