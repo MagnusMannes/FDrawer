@@ -1734,6 +1734,9 @@ function doVertexDrag(e) {
   vertex.dx = Math.max(minDx, startDx + delta);
   updatePolygonShape(part);
   updateVertexHandles(part);
+  updateAttachedShapes(part);
+  updateConnectors(part);
+  updateCanvasSize();
 }
 
 function stopVertexDrag() {
@@ -2242,6 +2245,10 @@ function doShapeDrag(e) {
     shape.elem.setAttribute('r', shape.r);
     updateShapeHandles(shape);
   }
+  if (shape.parentPart) {
+    updateShapeRelative(shape);
+  }
+  updateCanvasSize();
 }
 
 function stopShapeDrag() {
