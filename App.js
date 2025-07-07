@@ -85,6 +85,7 @@ function connectorOffset(p, pos) {
 }
 
 function updateCanvasSize(skipCenter = false) {
+  const prevScrollTop = canvasArea.scrollTop;
   const bottom = parts.reduce(
     (m, p) => Math.max(m, p.y + p.height + connectorOffset(p, 'bottom')),
     0
@@ -99,6 +100,8 @@ function updateCanvasSize(skipCenter = false) {
   canvas.setAttribute('height', newH);
   canvas.setAttribute('width', newW);
   if (autoCenter && !skipCenter) centerDiagram();
+  const maxScrollTop = Math.max(0, newH - canvasArea.clientHeight);
+  canvasArea.scrollTop = Math.min(prevScrollTop, maxScrollTop);
   updateAxes();
 }
 
@@ -1304,6 +1307,7 @@ function stopHResize() {
   window.removeEventListener("mouseup", stopHResize);
   window.removeEventListener("touchend", stopHResize);
   updateCanvasSize(true);
+  if (autoCenter) centerDiagram();
 }
 
 function updatePartWidth(part) {
@@ -1534,6 +1538,7 @@ function applyNewWidth(part, newW) {
   updateAttachedShapes(part);
   updateConnectors(part);
   updateCanvasSize(true);
+  if (autoCenter) centerDiagram();
 }
 
 function updatePartHeight(part, newH) {
