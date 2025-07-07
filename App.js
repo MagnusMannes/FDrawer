@@ -29,6 +29,7 @@ const canvasArea = document.getElementById("canvas_area");
 const partNameInput = document.getElementById("partName");
 const finishedBtn = document.getElementById("finishedBtn");
 const launchedFromFDiagram = !!window.opener;
+const autoCenter = !launchedFromFDiagram;
 if (launchedFromFDiagram) {
   finishedBtn.style.display = "block";
 }
@@ -97,7 +98,7 @@ function updateCanvasSize(skipCenter = false) {
   canvas.style.width = `${newW}px`;
   canvas.setAttribute('height', newH);
   canvas.setAttribute('width', newW);
-  if (!skipCenter) centerDiagram();
+  if (autoCenter && !skipCenter) centerDiagram();
   updateAxes();
 }
 
@@ -271,16 +272,20 @@ function handleMouseMove(e) {
   }
 }
 
-window.addEventListener("resize", centerDiagram);
+window.addEventListener("resize", () => {
+  if (autoCenter) centerDiagram();
+});
 
 function updateZoom() {
   zoomLayer.style.transformOrigin = "0 0";
   zoomLayer.style.transform = `scale(${zoom})`;
   updateCanvasSize(true);
-  centerDiagram();
+  if (autoCenter) {
+    centerDiagram();
+    // ensure centering after transform is applied
+    requestAnimationFrame(centerDiagram);
+  }
   updateAxes();
-  // ensure centering after transform is applied
-  requestAnimationFrame(centerDiagram);
 }
 
 function getSnappedPosition(x, y) {
