@@ -2459,6 +2459,9 @@ function loadFromData(data) {
   }
   ensureTopConnectorVisible();
   refreshDiagram();
+  // Perform another refresh on the next frame to ensure imported parts
+  // render correctly when launched from FDiagram.
+  requestAnimationFrame(refreshDiagram);
 }
 
 // capture initial empty state
