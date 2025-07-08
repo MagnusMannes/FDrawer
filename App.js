@@ -32,22 +32,22 @@ canvasArea.addEventListener('scroll', () => {
 });
 const partNameInput = document.getElementById("partName");
 const finishedBtn = document.getElementById("finishedBtn");
-const launchedFromFDiagram = !!window.opener;
-const autoCenter = !launchedFromFDiagram;
-if (launchedFromFDiagram) {
-  finishedBtn.style.display = "block";
+
+// Check if a component was provided via the "component" query parameter.
+const params = new URLSearchParams(window.location.search);
+let importedComponent = null;
+if (params.has("component")) {
+  try {
+    importedComponent = JSON.parse(decodeURIComponent(params.get("component")));
+  } catch (err) {
+    console.error("Invalid component parameter", err);
+  }
 }
 
-// Listen for edit requests from an opener (e.g. FDiagram)
-window.addEventListener('message', (e) => {
-  if (window.opener && e.source === window.opener) {
-    const msg = e.data || {};
-    if (msg.type === 'editComponent' && msg.component) {
-      saveState();
-      loadFromData(msg.component);
-    }
-  }
-});
+const autoCenter = true;
+if (window.opener || importedComponent) {
+  finishedBtn.style.display = "block";
+}
 let zoom = 1;
 let verticalScaleIndex = 0;
 function updateVerticalScaleIndex() {
@@ -2453,27 +2453,27 @@ function loadFromData(data) {
     });
   }
   updateCanvasSize();
-  if (launchedFromFDiagram) {
-    centerDiagram();
-    requestAnimationFrame(centerDiagram);
-  }
+  centerDiagram();
+  requestAnimationFrame(centerDiagram);
   ensureTopConnectorVisible();
   refreshDiagram();
   // Perform another refresh on the next frame to ensure imported parts
-  // render correctly when launched from FDiagram.
+  // render correctly after all elements are attached.
   requestAnimationFrame(refreshDiagram);
-  if (launchedFromFDiagram) {
-    setTimeout(() => {
-      refreshDiagram();
-      if (parts.length) {
-        const p = parts[0];
-        p.shape.setAttribute('fill', p.color);
-        applyPartGradient(p);
-      }
-    }, 500);
-  }
+  setTimeout(() => {
+    refreshDiagram();
+    if (parts.length) {
+      const p = parts[0];
+      p.shape.setAttribute('fill', p.color);
+      applyPartGradient(p);
+    }
+  }, 500);
 }
 
 // capture initial empty state
 saveState();
 updateCanvasSize();
+if (importedComponent) {
+  saveState();
+  loadFromData(importedComponent);
+}
