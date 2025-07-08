@@ -16,4 +16,12 @@ If an opener is present or a component was supplied this way, a **Finished**
 button will appear. Clicking it posts the updated component back to the opener
 using the `newComponent` message before closing the window.
 
+Alternatively, the component can be sent to an already opened editor using
+`postMessage`:
+
+```
+const win = window.open('index.html', '_blank');
+win.postMessage({ component: myComponent }, '*');
+```
+
 ![image](https://github.com/user-attachments/assets/7831bf8b-3fc6-44e1-bf2b-22e632ae586d)

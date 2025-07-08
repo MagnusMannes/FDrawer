@@ -44,6 +44,29 @@ if (params.has("component")) {
   }
 }
 
+// Allow loading a component via window.postMessage. This enables other
+// applications like FDiagram to open the editor and send a component after
+// the window has been created.
+window.addEventListener("message", (e) => {
+  const msg = e.data;
+  let data = null;
+  if (msg && typeof msg === "object" && msg.component) {
+    data = msg.component;
+  } else if (typeof msg === "string") {
+    try {
+      data = JSON.parse(msg);
+    } catch (_) {
+      // ignore invalid JSON
+    }
+  } else if (msg && typeof msg === "object" && (msg.parts || msg.drawnShapes)) {
+    data = msg;
+  }
+  if (data) {
+    loadFromData(data);
+    finishedBtn.style.display = "block";
+  }
+});
+
 const autoCenter = true;
 if (window.opener || importedComponent) {
   finishedBtn.style.display = "block";
