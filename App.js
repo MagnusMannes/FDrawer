@@ -2477,3 +2477,19 @@ if (importedComponent) {
   saveState();
   loadFromData(importedComponent);
 }
+
+// Allow parent windows to send a component via postMessage after the page has
+// loaded. This helps integrations that open FDrawer and then transmit the
+// component data separately.
+window.addEventListener('message', (event) => {
+  const data = event.data;
+  if (data && data.component) {
+    try {
+      saveState();
+      loadFromData(data.component);
+      finishedBtn.style.display = 'block';
+    } catch (err) {
+      console.error('Failed to load component from message', err);
+    }
+  }
+});
