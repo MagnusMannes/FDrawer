@@ -2445,7 +2445,7 @@ function clearCanvas() {
   canvas.appendChild(uiLayer);
   updateCanvasSize();
 }
-function loadFromData(data) {
+function loadFromData(data, ignorePositions = false) {
   clearCanvas();
   partNameInput.value = data.name || '';
   const indexMap = {};
@@ -2458,6 +2458,10 @@ function loadFromData(data) {
     }
     partsData.forEach((p, idx) => {
       indexMap[p._oldIndex] = idx;
+      if (ignorePositions) {
+        delete p.x;
+        delete p.y;
+      }
       createPartFromData(p, true);
     });
   }
@@ -2497,7 +2501,7 @@ saveState();
 updateCanvasSize();
 if (importedComponent) {
   saveState();
-  loadFromData(importedComponent);
+  loadFromData(importedComponent, !!window.opener);
 }
 
 // Allow parent windows to send a component via postMessage after the page has
@@ -2508,7 +2512,7 @@ window.addEventListener('message', (event) => {
   if (data && data.component) {
     try {
       saveState();
-      loadFromData(data.component);
+      loadFromData(data.component, !!window.opener);
       finishedBtn.style.display = 'block';
     } catch (err) {
       console.error('Failed to load component from message', err);
