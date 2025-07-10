@@ -114,9 +114,25 @@ function updateCanvasSize(skipCenter = false) {
 }
 
 function centerDiagram() {
-  if (!parts.length) return;
-  const left = Math.min(...parts.map((p) => p.x));
-  const right = Math.max(...parts.map((p) => p.x + p.width));
+  if (!parts.length && !drawnShapes.length) return;
+  let left = Infinity;
+  let right = -Infinity;
+  parts.forEach((p) => {
+    left = Math.min(left, p.x);
+    right = Math.max(right, p.x + p.width);
+  });
+  drawnShapes.forEach((s) => {
+    if (s.type === 'line') {
+      left = Math.min(left, s.x1, s.x2);
+      right = Math.max(right, s.x1, s.x2);
+    } else if (s.type === 'circle') {
+      left = Math.min(left, s.cx - s.r);
+      right = Math.max(right, s.cx + s.r);
+    } else if (s.type === 'curve') {
+      left = Math.min(left, s.p0.x, s.p1.x, s.p2.x);
+      right = Math.max(right, s.p0.x, s.p1.x, s.p2.x);
+    }
+  });
   const centerX = (left + right) / 2;
   // include the 20px wide left axis which is not scaled with zoom
   const axisOffset = 10; // half of the fixed 20px axis width
@@ -2494,6 +2510,8 @@ function loadFromData(data, ignorePositions = false) {
       applyPartGradient(p);
     }
   }, 500);
+  // save state after import so undo works as expected
+  saveState();
 }
 
 // capture initial empty state
