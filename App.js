@@ -660,17 +660,36 @@ function exportPart(part) {
 }
 
 function createPartFromData(p, skipUpdate = false) {
+  const prev = parts[parts.length - 1];
+  const width = typeof p.width === 'number' ? p.width : 60;
+  const height = typeof p.height === 'number' ? p.height : 120;
+  let x = typeof p.x === 'number' ? p.x : null;
+  let y = typeof p.y === 'number' ? p.y : null;
+  if (x === null) {
+    x = prev ? prev.x + prev.width / 2 - width / 2 : canvas.clientWidth / 2 - width / 2;
+  }
+  if (y === null) {
+    y = prev ? prev.y + prev.height : TOP_MARGIN;
+  }
+  const color = p.color || '#cccccc';
+
+  p.x = x;
+  p.y = y;
+  p.width = width;
+  p.height = height;
+  p.color = color;
+
   const g = document.createElementNS(svgNS, "g");
   const shape = document.createElementNS(svgNS, "polygon");
-  shape.setAttribute("fill", p.color);
+  shape.setAttribute("fill", color);
   shape.classList.add("body-shape");
   g.appendChild(shape);
 
   const rect = document.createElementNS(svgNS, "rect");
-  rect.setAttribute("x", p.x);
-  rect.setAttribute("y", p.y);
-  rect.setAttribute("width", p.width);
-  rect.setAttribute("height", p.height);
+  rect.setAttribute("x", x);
+  rect.setAttribute("y", y);
+  rect.setAttribute("width", width);
+  rect.setAttribute("height", height);
   rect.setAttribute("fill", "none");
   rect.setAttribute("pointer-events", "none");
   g.appendChild(rect);
@@ -2433,7 +2452,10 @@ function loadFromData(data) {
   let partsData = [];
   if (data.parts) {
     partsData = data.parts.map((p, idx) => ({ ...p, _oldIndex: idx }));
-    partsData.sort((a, b) => a.y - b.y);
+    const allY = partsData.every((pt) => typeof pt.y === 'number');
+    if (allY) {
+      partsData.sort((a, b) => a.y - b.y);
+    }
     partsData.forEach((p, idx) => {
       indexMap[p._oldIndex] = idx;
       createPartFromData(p, true);
