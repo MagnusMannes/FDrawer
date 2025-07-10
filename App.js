@@ -315,7 +315,7 @@ function saveState() {
 function undo() {
   if (!undoStack.length) return;
   const state = undoStack.pop();
-  loadFromData(JSON.parse(state));
+  loadFromData(JSON.parse(state), false);
 }
 
 document.getElementById("colorPicker").addEventListener("input", (e) => {
@@ -529,7 +529,7 @@ document.getElementById("fileInput").addEventListener("change", (e) => {
   rd.onload = () => {
     try {
       saveState();
-      loadFromData(JSON.parse(rd.result));
+      loadFromData(JSON.parse(rd.result), false);
     } catch (err) {
       alert("Invalid JSON");
     }
@@ -2426,7 +2426,7 @@ function clearCanvas() {
   canvas.appendChild(uiLayer);
   updateCanvasSize();
 }
-function loadFromData(data) {
+function loadFromData(data, incremental = false) {
   clearCanvas();
   partNameInput.value = data.name || '';
   const indexMap = {};
@@ -2434,12 +2434,14 @@ function loadFromData(data) {
   if (data.parts) {
     partsData = data.parts.map((p, idx) => ({ ...p, _oldIndex: idx }));
     partsData.sort((a, b) => a.y - b.y);
-    partsData.forEach((p, idx) => {
-      indexMap[p._oldIndex] = idx;
-      createPartFromData(p, true);
-    });
+    if (!incremental) {
+      partsData.forEach((p, idx) => {
+        indexMap[p._oldIndex] = idx;
+        createPartFromData(p, true);
+      });
+    }
   }
-  if (data.drawnShapes) {
+  if (!incremental && data.drawnShapes) {
     data.drawnShapes.forEach((s) => {
       const shapeData = { ...s };
       if (
@@ -2452,22 +2454,78 @@ function loadFromData(data) {
       if (obj) drawnShapes.push(obj);
     });
   }
-  updateCanvasSize();
-  centerDiagram();
-  requestAnimationFrame(centerDiagram);
-  ensureTopConnectorVisible();
-  refreshDiagram();
-  // Perform another refresh on the next frame to ensure imported parts
-  // render correctly after all elements are attached.
-  requestAnimationFrame(refreshDiagram);
-  setTimeout(() => {
+
+  if (incremental) {
+    let pIdx = 0;
+    const shapes = data.drawnShapes || [];
+    let sIdx = 0;
+    const addNextPart = () => {
+      if (pIdx < partsData.length) {
+        const p = partsData[pIdx];
+        indexMap[p._oldIndex] = pIdx;
+        createPartFromData(p, true);
+        updateCanvasSize();
+        refreshDiagram();
+        pIdx++;
+        requestAnimationFrame(addNextPart);
+      } else {
+        addNextShape();
+      }
+    };
+    const addNextShape = () => {
+      if (sIdx < shapes.length) {
+        const shapeData = { ...shapes[sIdx] };
+        if (
+          typeof shapeData.parentIndex === 'number' &&
+          indexMap.hasOwnProperty(shapeData.parentIndex)
+        ) {
+          shapeData.parentIndex = indexMap[shapeData.parentIndex];
+        }
+        const obj = createDrawnShapeFromData(shapeData);
+        if (obj) drawnShapes.push(obj);
+        updateCanvasSize();
+        refreshDiagram();
+        sIdx++;
+        requestAnimationFrame(addNextShape);
+      } else {
+        finalize();
+      }
+    };
+    const finalize = () => {
+      updateCanvasSize();
+      centerDiagram();
+      requestAnimationFrame(centerDiagram);
+      ensureTopConnectorVisible();
+      refreshDiagram();
+      requestAnimationFrame(refreshDiagram);
+      setTimeout(() => {
+        refreshDiagram();
+        if (parts.length) {
+          const p = parts[0];
+          p.shape.setAttribute('fill', p.color);
+          applyPartGradient(p);
+        }
+      }, 500);
+    };
+    addNextPart();
+  } else {
+    updateCanvasSize();
+    centerDiagram();
+    requestAnimationFrame(centerDiagram);
+    ensureTopConnectorVisible();
     refreshDiagram();
-    if (parts.length) {
-      const p = parts[0];
-      p.shape.setAttribute('fill', p.color);
-      applyPartGradient(p);
-    }
-  }, 500);
+    // Perform another refresh on the next frame to ensure imported parts
+    // render correctly after all elements are attached.
+    requestAnimationFrame(refreshDiagram);
+    setTimeout(() => {
+      refreshDiagram();
+      if (parts.length) {
+        const p = parts[0];
+        p.shape.setAttribute('fill', p.color);
+        applyPartGradient(p);
+      }
+    }, 500);
+  }
 }
 
 // capture initial empty state
@@ -2475,7 +2533,7 @@ saveState();
 updateCanvasSize();
 if (importedComponent) {
   saveState();
-  loadFromData(importedComponent);
+  loadFromData(importedComponent, true);
 }
 
 // Allow parent windows to send a component via postMessage after the page has
@@ -2486,7 +2544,7 @@ window.addEventListener('message', (event) => {
   if (data && data.component) {
     try {
       saveState();
-      loadFromData(data.component);
+      loadFromData(data.component, true);
       finishedBtn.style.display = 'block';
     } catch (err) {
       console.error('Failed to load component from message', err);
