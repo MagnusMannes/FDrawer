@@ -2466,6 +2466,10 @@ function loadFromData(data, ignorePositions = false) {
   partNameInput.value = data.name || '';
   const indexMap = {};
   let partsData = [];
+  let oldLeft = Infinity,
+    oldTop = Infinity;
+  let newLeft = Infinity,
+    newTop = Infinity;
   if (data.parts) {
     partsData = data.parts.map((p, idx) => ({ ...p, _oldIndex: idx }));
     const allY = partsData.every((pt) => typeof pt.y === 'number');
@@ -2474,12 +2478,16 @@ function loadFromData(data, ignorePositions = false) {
     }
     partsData.forEach((p, idx) => {
       indexMap[p._oldIndex] = idx;
+      if (typeof p.x === 'number') oldLeft = Math.min(oldLeft, p.x);
+      if (typeof p.y === 'number') oldTop = Math.min(oldTop, p.y);
       if (ignorePositions) {
         delete p.x;
         delete p.y;
       }
       createPartFromData(p, true);
     });
+    newLeft = Math.min(...parts.map((pt) => pt.x));
+    newTop = Math.min(...parts.map((pt) => pt.y));
   }
   if (data.drawnShapes) {
     data.drawnShapes.forEach((s) => {
@@ -2491,7 +2499,39 @@ function loadFromData(data, ignorePositions = false) {
         shapeData.parentIndex = indexMap[shapeData.parentIndex];
       }
       const obj = createDrawnShapeFromData(shapeData);
-      if (obj) drawnShapes.push(obj);
+      if (obj) {
+        if (ignorePositions && !obj.parentPart) {
+          const dx = oldLeft !== Infinity ? newLeft - oldLeft : 0;
+          const dy = oldTop !== Infinity ? newTop - oldTop : 0;
+          if (obj.type === 'line') {
+            obj.x1 += dx;
+            obj.y1 += dy;
+            obj.x2 += dx;
+            obj.y2 += dy;
+            obj.elem.setAttribute('x1', obj.x1);
+            obj.elem.setAttribute('y1', obj.y1);
+            obj.elem.setAttribute('x2', obj.x2);
+            obj.elem.setAttribute('y2', obj.y2);
+          } else if (obj.type === 'circle') {
+            obj.cx += dx;
+            obj.cy += dy;
+            obj.elem.setAttribute('cx', obj.cx);
+            obj.elem.setAttribute('cy', obj.cy);
+          } else if (obj.type === 'curve') {
+            obj.p0.x += dx;
+            obj.p0.y += dy;
+            obj.p1.x += dx;
+            obj.p1.y += dy;
+            obj.p2.x += dx;
+            obj.p2.y += dy;
+            obj.elem.setAttribute(
+              'd',
+              `M ${obj.p0.x} ${obj.p0.y} Q ${obj.p1.x} ${obj.p1.y} ${obj.p2.x} ${obj.p2.y}`
+            );
+          }
+        }
+        drawnShapes.push(obj);
+      }
     });
   }
   updateCanvasSize();
