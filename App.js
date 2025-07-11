@@ -44,7 +44,7 @@ if (params.has("component")) {
   }
 }
 
-const autoCenter = true;
+let autoCenter = true;
 if (window.opener || importedComponent) {
   finishedBtn.style.display = "block";
 }
@@ -287,7 +287,11 @@ function handleCanvasClick(e) {
 canvas.addEventListener('click', handleCanvasClick, true);
 canvas.addEventListener('mousemove', handleMouseMove, true);
 canvas.addEventListener('mousedown', (e) => {
-  if (!drawMode && !e.target.closest('.drawn-shape')) {
+  if (
+    !drawMode &&
+    !e.target.closest('.drawn-shape') &&
+    !e.target.closest('.body-shape')
+  ) {
     clearSelectedShape();
   }
 });
@@ -1071,6 +1075,7 @@ function addPartEventListeners(part) {
 
 // --- Selection & Connector Logic ---
 function selectPart(part) {
+  clearSelectedShape();
   if (selectedPart) {
     toggleHandles(selectedPart, false);
     selectedPart.rect.classList.remove("selected");
@@ -2184,6 +2189,12 @@ function updateShapeHandles(shape) {
 
 function selectShape(shape) {
   if (selectedShape === shape) return;
+  if (selectedPart) {
+    toggleHandles(selectedPart, false);
+    selectedPart.rect.classList.remove('selected');
+    if (selectedPart.shape) selectedPart.shape.classList.remove('selected');
+    selectedPart = null;
+  }
   clearSelectedShape();
   selectedShape = shape;
   shape.elem.classList.add('selected');
@@ -2549,22 +2560,11 @@ function loadFromData(data, ignorePositions = false) {
       }
     });
   }
-  updateCanvasSize();
-  centerDiagram();
+  updateCanvasSize(true);
   requestAnimationFrame(centerDiagram);
   ensureTopConnectorVisible();
   refreshDiagram();
-  // Perform another refresh on the next frame to ensure imported parts
-  // render correctly after all elements are attached.
-  requestAnimationFrame(refreshDiagram);
-  setTimeout(() => {
-    refreshDiagram();
-    if (parts.length) {
-      const p = parts[0];
-      p.shape.setAttribute('fill', p.color);
-      applyPartGradient(p);
-    }
-  }, 500);
+  autoCenter = false;
   // save state after import so undo works as expected
   saveState();
 }
