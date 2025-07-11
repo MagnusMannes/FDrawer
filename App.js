@@ -48,7 +48,6 @@ let autoCenter = true;
 if (window.opener || importedComponent) {
   finishedBtn.style.display = "block";
 }
-let autoDemoDone = false;
 let zoom = 1;
 let verticalScaleIndex = 0;
 function updateVerticalScaleIndex() {
@@ -679,7 +678,6 @@ function addBody() {
   // select the new part so all handles are visible
   selectPart(part);
   updateCanvasSize();
-  return part;
 }
 
 function exportPart(part) {
@@ -2583,19 +2581,9 @@ function loadFromData(data, ignorePositions = false) {
 // capture initial empty state
 saveState();
 updateCanvasSize();
-
-function runAutoDemo() {
-  if (autoDemoDone) return;
-  autoDemoDone = true;
-  const part = addBody();
-  setTimeout(() => {
-    removePart(part);
-  }, 500);
-}
 if (importedComponent) {
   saveState();
   loadFromData(importedComponent, !!window.opener);
-  if (window.opener) runAutoDemo();
 }
 
 // Allow parent windows to send a component via postMessage after the page has
@@ -2608,7 +2596,6 @@ window.addEventListener('message', (event) => {
       saveState();
       loadFromData(data.component, !!window.opener);
       finishedBtn.style.display = 'block';
-      if (window.opener) runAutoDemo();
     } catch (err) {
       console.error('Failed to load component from message', err);
     }
