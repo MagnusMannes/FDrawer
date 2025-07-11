@@ -93,11 +93,26 @@ function connectorOffset(p, pos) {
 
 function updateCanvasSize(skipCenter = false) {
   const prevScrollTop = lastScrollTop;
-  const bottom = parts.reduce(
+  // Bodies ---------------------------------------------------------------
+  let bottom = parts.reduce(
     (m, p) => Math.max(m, p.y + p.height + connectorOffset(p, 'bottom')),
     0
   );
-  const right = parts.reduce((m, p) => Math.max(m, p.x + p.width), 0);
+  let right = parts.reduce((m, p) => Math.max(m, p.x + p.width), 0);
+
+  // Free-hand shapes -----------------------------------------------------
+  drawnShapes.forEach((s) => {
+    if (s.type === 'line') {
+      bottom = Math.max(bottom, s.y1, s.y2);
+      right = Math.max(right, s.x1, s.x2);
+    } else if (s.type === 'circle') {
+      bottom = Math.max(bottom, s.cy + s.r);
+      right = Math.max(right, s.cx + s.r);
+    } else if (s.type === 'curve') {
+      bottom = Math.max(bottom, s.p0.y, s.p1.y, s.p2.y);
+      right = Math.max(right, s.p0.x, s.p1.x, s.p2.x);
+    }
+  });
   const scaledH = bottom * zoom + 40;
   const scaledW = right * zoom + 40;
   const newH = Math.max(canvasArea.clientHeight, scaledH, bottom + 40);
