@@ -92,7 +92,6 @@ function connectorOffset(p, pos) {
 }
 
 function updateCanvasSize(skipCenter = false) {
-  const prevScrollTop = lastScrollTop;
   // Bodies ---------------------------------------------------------------
   let bottom = parts.reduce(
     (m, p) => Math.max(m, p.y + p.height + connectorOffset(p, 'bottom')),
@@ -117,13 +116,23 @@ function updateCanvasSize(skipCenter = false) {
   const scaledW = right * zoom + 40;
   const newH = Math.max(canvasArea.clientHeight, scaledH, bottom + 40);
   const newW = Math.max(canvasArea.clientWidth, scaledW, right + 40);
-  canvas.style.height = `${newH}px`;
-  canvas.style.width = `${newW}px`;
-  canvas.setAttribute('height', newH);
-  canvas.setAttribute('width', newW);
+
+  // don't let the canvas shrink once it has grown
+  const currentH = parseFloat(canvas.style.height) || 0;
+  const currentW = parseFloat(canvas.style.width) || 0;
+  const finalH = Math.max(currentH, newH);
+  const finalW = Math.max(currentW, newW);
+
+  canvas.style.height = `${finalH}px`;
+  canvas.style.width = `${finalW}px`;
+  canvas.setAttribute('height', finalH);
+  canvas.setAttribute('width', finalW);
   if (autoCenter && !skipCenter) centerDiagram();
-  const maxScrollTop = Math.max(0, newH - canvasArea.clientHeight);
-  canvasArea.scrollTop = Math.min(prevScrollTop, maxScrollTop);
+  const maxScrollTop = Math.max(0, finalH - canvasArea.clientHeight);
+  // don't touch scrollTop unless we would end up past the bottom
+  if (canvasArea.scrollTop > maxScrollTop) {
+    canvasArea.scrollTop = maxScrollTop;
+  }
   lastScrollTop = canvasArea.scrollTop;
   updateAxes();
 }
